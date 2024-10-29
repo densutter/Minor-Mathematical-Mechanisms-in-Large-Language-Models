@@ -198,7 +198,7 @@ class LLM_remote:
         return Gradients,Correctly_classified
         
         
-    def helper_grad_smoothGrad(self,combined_gradients): #Helper function to prepare gradient output for smoothGrad
+    def helper_grad_smoothGrad(self,combined_gradients,Layer_Name,Ac_Layer_Index): #Helper function to prepare gradient output for smoothGrad
         if not  isinstance(self.extracted_outputs[Layer_Name][Ac_Layer_Index], torch.Tensor):
             if Ac_Layer_Index not in combined_gradients[Layer_Name]:
                 combined_gradients[Layer_Name][Ac_Layer_Index]=[]
@@ -243,7 +243,7 @@ class LLM_remote:
                         Correctly_classified+=1
                     Total_classified+=1
 
-                    combined_gradients=self.helper_grad_smoothGrad(combined_gradients)
+                    combined_gradients=self.helper_grad_smoothGrad(combined_gradients,Layer_Name,Ac_Layer_Index)
                     self.extracted_outputs[Layer_Name][Ac_Layer_Index]=None
                     
                 self.layer_of_interest[Layer_Name][Ac_Layer_Index]=False
