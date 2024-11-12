@@ -47,13 +47,17 @@ def Make_Heatmap_Relevance_Map(HM_Values,Relevance_Heatmap_URL):
     ensure_folder_exists(Relevance_Heatmap_URL)
     for ac_Layer in HM_Values:
         Heatmap_Vals=[]
+        Heatmap_Vals_Norm=[]
         for ac_Depth in HM_Values[ac_Layer]:
             if len(np.array(HM_Values[ac_Layer][ac_Depth]).shape)<2:
                 HM_Values[ac_Layer][ac_Depth]=[HM_Values[ac_Layer][ac_Depth]]
             for ac_i_p,ac_i in enumerate(HM_Values[ac_Layer][ac_Depth]):
                 while len(Heatmap_Vals)<=ac_i_p:
                     Heatmap_Vals.append([None]*len(HM_Values[ac_Layer]))
+                    Heatmap_Vals_Norm.append([None]*len(HM_Values[ac_Layer]))
                 Heatmap_Vals[ac_i_p][ac_Depth]=ac_i
+                np_ac_i=np.array(ac_i)
+                Heatmap_Vals_Norm[ac_i_p][ac_Depth]=(np_ac_i/np.abs(np_ac_i).max()).tolist()
         for p_ak2,ak2 in enumerate(Heatmap_Vals):
             ak2=np.array(ak2)
             #print()
@@ -63,6 +67,12 @@ def Make_Heatmap_Relevance_Map(HM_Values,Relevance_Heatmap_URL):
             fig.set_size_inches(18, 8)  # Set the size in inches
             sns.heatmap(ak2,cmap='icefire', center=0)
             plt.savefig(Relevance_Heatmap_URL+'Diff_Heatmap_'+ac_Layer+'_'+str(p_ak2)+'.png',bbox_inches='tight')
+            plt.close()
+
+            fig = plt.gcf()  # Get the current figure
+            fig.set_size_inches(18, 8)  # Set the size in inches
+            sns.heatmap(Heatmap_Vals_Norm[p_ak2],cmap='icefire', center=0)
+            plt.savefig(Relevance_Heatmap_URL+'Diff_Heatmap_Normalized_'+ac_Layer+'_'+str(p_ak2)+'.png',bbox_inches='tight')
             plt.close()
 
 
@@ -211,7 +221,7 @@ def Make_Heatmap_Probing_Helper(probing_results,probing_results_url):
                         if p_value_plot_data[i][j] < statistical_significance_value:  # Condition to highlight
                             # Create a rectangle with a specific edge color and width
                             #print("nice")
-                            rect = patches.Rectangle((j, i), 1, 1, fill=False, edgecolor='green', linewidth=2)
+                            rect = patches.Rectangle((j, i), 1, 1, fill=False, edgecolor='#9ACD32', linewidth=2)
                             ax.add_patch(rect)
 
                 # Save the figure
