@@ -9,3 +9,5 @@ Prediction_Model.py: Includes the code necessary to run and evaluate the relevan
 Prediction_Helpers.py: Includes helper code for Relevance_Maps.py and Probing.py
 
 Probing.py: Includes the code for the probing experiments
+
+Generate_Result_Graphics.py: Generate some heatmaps for analysis
