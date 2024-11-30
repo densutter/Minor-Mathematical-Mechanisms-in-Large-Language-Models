@@ -6,8 +6,8 @@ import torch
 torch.set_num_threads(6)
 
 #Hyperparameters:
-model_id = "Local-Meta-Llama-3.2-1B"
-Relevance_Map_Method='vanilla_gradient' #'smoothGrad'
+model_id = "meta-llama/Llama-3.2-1B" #"Local-Meta-Llama-3.2-1B"
+Relevance_Map_Method="LXT" #'smoothGrad'
 Probing_Method='Probing'
 tokenizer = AutoTokenizer.from_pretrained(model_id)
 Use_Context=True
@@ -32,8 +32,8 @@ RelMap=Relevance_Maps.Relevance_Map(
     Task_1,
     Task_2,
     tokenizer,
-    Allowed_Model_Usage_Before_Refresh=10,
-    max_memory='cpu',
+    Allowed_Model_Usage_Before_Refresh=100,
+    max_memory='cuda',
     num_gpus=1,
     num_cpus=10
 )
@@ -53,14 +53,15 @@ MyProbing=Probing.Probing(
     Testing_Samples,
     probing_layers=1,
     Allowed_Model_Usage_Before_Refresh=200,
-    max_memory={0: "10GiB", "cpu": "30GiB"},
+    max_memory="cuda", #{0: "10GiB", "cpu": "30GiB"},
     num_gpus=1,
-    num_cpus=10
+    num_cpus=10,
+    probing_models_device='cpu'
 )
 MyProbing.Get_Probing_Results(Number_of_samples=2000)
 print("[INFO] Step 3: Finished")
 
-
+"""
 #Step 4: Use relevance map for probing
 print("[INFO] Step 4: Probing with 2 Layers")
 MyProbing=Probing.Probing(
@@ -79,3 +80,4 @@ MyProbing=Probing.Probing(
 )
 MyProbing.Get_Probing_Results(Number_of_samples=2000)
 print("[INFO] Step 4: Finished")
+"""
