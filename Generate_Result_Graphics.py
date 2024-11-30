@@ -103,7 +103,7 @@ def analyze_data(input_data_structure, test_loss_num):
                         bottom_loss_values = output_version[1][keep_percentage][-test_loss_num:]
 
 
-                        # Compute means, variances, and differences
+                        # Compute means, variances, and differences                        
                         metrics["mean_top_keep_"+keep_percentage] = np.mean(top_loss_values)
                         metrics["mean_bottom_keep_"+keep_percentage] = np.mean(bottom_loss_values)
                         metrics["variance_top_keep_"+keep_percentage] = np.var(top_loss_values)
@@ -134,30 +134,30 @@ def Make_Heatmap_Probing_Helper(probing_results,probing_results_url):
                 vari={}
                 vari["top"]={}
                 vari["bottom"]={}
-                ac_depth=len(probing_results[intermed_var][layer_name][output_version_idx])
+                ac_depth=len(probing_results[intermed_var][layer_name][output_version_idx]) 
                 for keep_percentage in keep_percentages:
                     mean["top"][keep_percentage]=[None]*ac_depth
                     mean["bottom"][keep_percentage]=[None]*ac_depth
                     vari["top"][keep_percentage]=[None]*ac_depth
                     vari["bottom"][keep_percentage]=[None]*ac_depth
-
+                
                 differe={}
                 p_value={}
                 for keep_percentage in keep_percentages:
                     if keep_percentage!="1":
                         differe[keep_percentage]=[None]*ac_depth
-                        p_value[keep_percentage]=[None]*ac_depth
-
+                        p_value[keep_percentage]=[None]*ac_depth 
+                
                 for depth in range(len(probing_results[intermed_var][layer_name][output_version_idx])):
                     for tb in mean:
-                        for per in mean[tb]:
+                        for per in mean[tb]:  
                             mean[tb][per][depth]=probing_results[intermed_var][layer_name][output_version_idx][depth]["mean_"+tb+"_keep_"+per]
                             vari[tb][per][depth]=probing_results[intermed_var][layer_name][output_version_idx][depth]["variance_"+tb+"_keep_"+per]
-
+                    
                     for per in differe:
                         differe[per][depth]=probing_results[intermed_var][layer_name][output_version_idx][depth]["mean_diff_keep_"+per]
                         p_value[per][depth]=probing_results[intermed_var][layer_name][output_version_idx][depth]["p_value_diff_keep_"+per]
-
+                
 
 
                 #Make mean and variance heatmaps
@@ -170,26 +170,26 @@ def Make_Heatmap_Probing_Helper(probing_results,probing_results_url):
                 plot_x_axis=list(range(ac_depth))
                 for per in keep_percentages:
                     for tb in ["top","bottom"]:
-
+                        
                         plot_y_axis.append(per+"-"+tb)
-
+                        
                         mean_plot_data.append(mean[tb][per])
                         vari_plot_data.append(vari[tb][per])
 
-
+                
                 fig = plt.gcf()  # Get the current figure
                 fig.set_size_inches(18, 8)  # Set the size in inches
                 sns.heatmap(mean_plot_data,cmap='icefire', center=0,xticklabels=plot_x_axis, yticklabels=plot_y_axis)
                 plt.savefig(probing_results_url+'/Mean_Heatmap_'+intermed_var+"-"+layer_name+'_'+str(output_version_idx)+'.png',bbox_inches='tight')
                 plt.close()
-
+                
                 fig = plt.gcf()  # Get the current figure
                 fig.set_size_inches(18, 8)  # Set the size in inches
                 sns.heatmap(vari_plot_data,cmap='icefire', center=0,xticklabels=plot_x_axis, yticklabels=plot_y_axis)
                 plt.savefig(probing_results_url+'/Variance_Heatmap_'+intermed_var+"-"+layer_name+'_'+str(output_version_idx)+'.png',bbox_inches='tight')
                 plt.close()
-
-
+                        
+                
 
                 #Make difference p-value plot
                 differe_plot_data=[]
@@ -202,19 +202,19 @@ def Make_Heatmap_Probing_Helper(probing_results,probing_results_url):
                 for per in keep_percentages:
                     if per!="1":
                         plot_y_axis.append(per)
-
+                        
                         differe_plot_data.append(differe[per])
                         p_value_plot_data.append(p_value[per])
-
+                
                 fig = plt.gcf()  # Get the current figure
                 fig.set_size_inches(18, 8)  # Set the figure size in inches
-
+                
                 # Create the heatmap
                 sns.heatmap(differe_plot_data, cmap='icefire', center=0, xticklabels=plot_x_axis, yticklabels=plot_y_axis)
-
+                
                 # Get the current axes
                 ax = plt.gca()
-
+                
                 # Loop over each cell in the p_vals array to check the p-value
                 for i in range(len(p_value_plot_data)):  # Iterate over rows
                     for j in range(len(p_value_plot_data[i])):  # Iterate over columns
@@ -223,26 +223,26 @@ def Make_Heatmap_Probing_Helper(probing_results,probing_results_url):
                             #print("nice")
                             rect = patches.Rectangle((j, i), 1, 1, fill=False, edgecolor='#9ACD32', linewidth=2)
                             ax.add_patch(rect)
-
+                
                 # Save the figure
                 plt.savefig(probing_results_url+'/Diff_Heatmap_'+intermed_var+"-"+layer_name+'_'+str(output_version_idx)+'.png', bbox_inches='tight')
                 plt.close()
-
-
+                            
+                
 
 def Make_Heatmap_Probing(probing_interim_results_url,probing_results_url,Task_1_Name,Task_2_Name,Testing_Samples):
     for ac_Task_Name in [Task_1_Name,Task_2_Name]:
-
+        
         probing_interim_results_url_h = probing_interim_results_url+ac_Task_Name+"/Metadata.json"
         probing_results_url_h         = probing_results_url+ac_Task_Name
         ensure_folder_exists(probing_results_url_h)
-
+        
         with open(probing_interim_results_url_h, 'r') as file:
             probing_interim_results = json.load(file)
         probing_results=analyze_data(probing_interim_results["Loss"], Testing_Samples)
         with open(probing_results_url_h+"/Results.json", 'w') as file:
             json.dump(probing_results, file, indent=4)
-
+        
         Make_Heatmap_Probing_Helper(probing_results,probing_results_url_h)
 
 
@@ -250,7 +250,7 @@ print("[INFO] Step 1: Generate Heatmaps for Relevance Maps")
 
 RelMap=Relevance_Maps.Relevance_Map(
     None,
-    "vanilla_gradient",
+    "captum-GradientXActivation",
     Task_1,
     Task_2,
     None,

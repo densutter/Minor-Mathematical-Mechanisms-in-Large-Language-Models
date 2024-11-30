@@ -15,6 +15,7 @@ import numpy as np
 import ray
 import gc
 import copy
+import math
 
 
 
@@ -33,12 +34,14 @@ class Relevance_Map(Prediction_Helpers.Prediction_Helper):
         Allowed_Model_Usage_Before_Refresh=1,
         max_memory="cpu",
         num_gpus=0,
-        num_cpus=1
+        num_cpus=1,
+        num_baselines=100
         ):
 
         self.model_id=model_id
-
-        self.Actually_Supported_Relevance_Map_Methods=['vanilla_gradient','smoothGrad']
+        
+        self.Baseline_Methods=["captum-IntegratedGradients"]
+        self.Actually_Supported_Relevance_Map_Methods=self.Baseline_Methods+['vanilla_gradient','smoothGrad','captum-GradientXActivation',"LXT"]
         if Relevance_Map_Method not in self.Actually_Supported_Relevance_Map_Methods:
             raise Exception("Relevance_Map_Method "+str(Relevance_Map_Method)+" is not supported in this Version.")
         self.Relevance_Map_Method=Relevance_Map_Method
@@ -63,7 +66,28 @@ class Relevance_Map(Prediction_Helpers.Prediction_Helper):
         self.num_gpus=num_gpus
         self.num_cpus=num_cpus
 
+        self.Baselines=0
+
         self.Random_Offset=20275043
+
+
+        """
+        if self.Actually_Supported_Relevance_Map_Methods in self.Baseline_Methods:
+            
+            num_samples=math.ceil(num_baselines/2)
+
+            self.Baselines=[]
+            for ac_task in [self.task_1,self.task_2]:
+                iterator=None
+                if num_samples < len(ac_task.Test_Samples):
+                    iterator=random.sample(range(len(ac_task.Test_Samples)), num_samples)
+                else:
+                    iterator=list(range(len(ac_task.Test_Samples)))
+                
+                for ac_sample_point in len(ac_task.Test_Samples):
+                    test_sample=ac_task.get_Train_Sample(ac_sample_point)
+                    self.Baselines.append(test_sample[0])
+        """
 
 
     def Check_Interim_Results_Folder(self):
@@ -78,6 +102,7 @@ class Relevance_Map(Prediction_Helpers.Prediction_Helper):
         self.Metadata={}
         ac_url=self.interim_results_path+self.task_1.Task_Name
         all_files=self.safe_listdir(ac_url)
+        #print(ac_url)
         if  all_files is not None and 'Metadata.json' in all_files:
             with open(ac_url+'/Metadata.json', 'r') as file:
                 self.Metadata[self.task_1.Task_Name] = json.load(file)
@@ -360,7 +385,7 @@ class Relevance_Map(Prediction_Helpers.Prediction_Helper):
 
             Gradients,Correctly_classified=self.Get_Results(Task_Text,Task_Result)
 
-            self.Metadata[actual_task_key]['Accuracy']+=1
+            self.Metadata[actual_task_key]['Accuracy']+=Correctly_classified
             #print("*"*100)
             #print(Correctly_classified)
             #print(Gradients)
@@ -390,4 +415,3 @@ class Relevance_Map(Prediction_Helpers.Prediction_Helper):
 
         ray.shutdown()
         return self.Compute_Relevance_Map(Gradient_Means,Gradient_Variance)
-
