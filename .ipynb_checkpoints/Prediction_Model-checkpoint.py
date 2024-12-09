@@ -48,8 +48,6 @@ class LLM_remote:
         self.SG_iterations=SG_iterations
         self.Relevance_Map_Method=Relevance_Map_Method
         self.Baselines=Baselines
-        #self.task_1=task_1
-        #self.task_2=task_2
 
         # Step 1: Use infer_auto_device_map to get the device map for the model
         with init_empty_weights():
@@ -76,10 +74,6 @@ class LLM_remote:
         self.layers_to_hook_layer_list.append(self.model.model.embed_tokens)
         self.layers_to_hook_name_list.append(["embed_tokens",0])
 
-        self.number_tokens=[]
-        for ac_num in range(1001):
-            self.number_tokens.append(self.tokenizer(str(ac_num), return_tensors="pt").input_ids[0][1].item())
-
         for i_p,i in enumerate(self.model.model.layers):
 
             if "q_proj" not in self.layers_to_hook:
@@ -99,14 +93,12 @@ class LLM_remote:
             self.layers_to_hook["v_proj"].append(i.self_attn.v_proj)
             self.layers_to_hook_layer_list.append(i.self_attn.v_proj)
             self.layers_to_hook_name_list.append(["v_proj",i_p])
-            
-            #print((self.Relevance_Map_Method not in ["captum-IntegratedGradients"]) or i_p==10)
-            if self.Relevance_Map_Method not in ["captum-IntegratedGradients"]:
-                if "o_proj" not in self.layers_to_hook:
-                    self.layers_to_hook["o_proj"]=[]
-                self.layers_to_hook["o_proj"].append(i.self_attn.o_proj)
-                self.layers_to_hook_layer_list.append(i.self_attn.o_proj)
-                self.layers_to_hook_name_list.append(["o_proj",i_p])
+
+            if "o_proj" not in self.layers_to_hook:
+                self.layers_to_hook["o_proj"]=[]
+            self.layers_to_hook["o_proj"].append(i.self_attn.o_proj)
+            self.layers_to_hook_layer_list.append(i.self_attn.o_proj)
+            self.layers_to_hook_name_list.append(["o_proj",i_p])
 
             #Is not used in this setting (no gradients found)
             #if "rotary_emb" not in layers_to_hook:
@@ -148,6 +140,14 @@ class LLM_remote:
             fa = captum.attr.LayerGradientXActivation(self.model,self.layers_to_hook_layer_list)
             self.model_captum = LLMGradientAttribution_Features(fa, self.captum_tokenizer)
 
+        
+        elif self.Relevance_Map_Method=="captum-GradientShap":
+            self.captum_tokenizer=copy.deepcopy(self.tokenizer)
+            self.captum_tokenizer.pad_token = self.captum_tokenizer.eos_token
+            fa = captum.attr.LayerGradientShap(self.model,self.layers_to_hook_layer_list)
+            self.model_captum = LLMGradientAttribution_Features(fa, self.captum_tokenizer)
+            self.needs_baseline=True
+
         elif self.Relevance_Map_Method=="captum-IntegratedGradients":
             self.captum_tokenizer=copy.deepcopy(self.tokenizer)
             self.captum_tokenizer.pad_token = self.captum_tokenizer.eos_token
@@ -169,9 +169,7 @@ class LLM_remote:
                 with autocast():
                     if Use_Captum:
                         if self.needs_baseline:
-                            #print(Task_Text_Tokens)
-                            #print(Result_Target)
-                            M_outputs = self.model_captum.attribute(Task_Text_Tokens, baselines=self.Baselines,target=Result_Target)
+                            M_outputs = self.model_captum.attribute(Task_Text_Tokens, baselines=self.Baselines ,target=Result_Target)
                         else:
                             M_outputs = self.model_captum.attribute(Task_Text_Tokens, target=Result_Target)
                     else:
@@ -179,7 +177,7 @@ class LLM_remote:
         else:
             if Use_Captum:
                 if self.needs_baseline:
-                    M_outputs = self.model_captum.attribute(Task_Text_Tokens,self=self.Baselines,target=Result_Target)
+                    M_outputs = self.model_captum.attribute(Task_Text_Tokens, baselines=self.Baselines ,target=Result_Target)
                 else:
                     M_outputs = self.model_captum.attribute(Task_Text_Tokens, target=Result_Target)
             else:
@@ -287,17 +285,6 @@ class LLM_remote:
         Task_Text_Tokens = {key: value.to(self.model_device) for key, value in Task_Text_Tokens.items()}
         return Task_Result_Token,Task_Text_Tokens
 
-    def is_correctly_classified(self,true_token,logits):
-        subset=logits[self.number_tokens]
-        am=torch.argmax(subset).item()
-        correctly_classified=0
-        if self.number_tokens[am]==true_token:
-            correctly_classified=1
-        gold_int=int(self.tokenizer.decode(true_token))
-        pred_int=int(self.tokenizer.decode(self.number_tokens[am]))
-        abs_dist=abs(gold_int-pred_int)
-        return [correctly_classified,abs_dist]
-        
     def get_results_vanilla_gradient(self,Task_Text,Task_Result):
         # Prepare Input
         Task_Result_Token,Task_Text_Tokens=self.Prepare_Input(Task_Text,Task_Result)
@@ -308,7 +295,10 @@ class LLM_remote:
         self.backward_pass(loss)
 
         # Prepare outputs
-        Correctly_classified=self.is_correctly_classified(Task_Result_Token,Model_output.logits[0][-1])
+        if Task_Result_Token==torch.argmax(Model_output.logits[0][-1]).item():
+            Correctly_classified=1
+        else:
+            Correctly_classified=0
         Gradients=self.tensors_to_lists(self.extracted_outputs)
 
         return Gradients,Correctly_classified
@@ -332,6 +322,9 @@ class LLM_remote:
 
         return combined_gradients
 
+    def list_of_attributions_to_dict(self,attributions):
+        for ac_a_p,ac_a in enumerate(attributions):
+            pass
 
     def get_results_smoothGrad(self,Task_Text,Task_Result):
         # Prepare Input
@@ -340,7 +333,6 @@ class LLM_remote:
         #Get and average over Gradients:
         combined_gradients={}
         Correctly_classified=0
-        Abs_distance=0
         Total_classified=0
         for Layer_Name in self.layers_to_hook:
             if Layer_Name not in self.extracted_outputs:
@@ -357,9 +349,8 @@ class LLM_remote:
                     loss = Model_output.logits[0][-1][Task_Result_Token]
                     self.backward_pass(loss)
 
-                    ccr=self.is_correctly_classified(Task_Result_Token,Model_output.logits[0][-1])
-                    Correctly_classified+=ccr[0]
-                    Abs_distance+=ccr[1]
+                    if Task_Result_Token==torch.argmax(Model_output.logits[0][-1]).item():
+                        Correctly_classified+=1
                     Total_classified+=1
 
                     combined_gradients=self.helper_grad_smoothGrad(combined_gradients,Layer_Name,Ac_Layer_Index)
@@ -375,10 +366,8 @@ class LLM_remote:
                 else:
                     combined_gradients[Layer_Name][Ac_Layer_Index]=combined_gradients[Layer_Name][Ac_Layer_Index]/self.SG_iterations
         Correctly_classified=Correctly_classified/Total_classified
-        Abs_distance=Abs_distance/Total_classified
-        return combined_gradients,[Correctly_classified,Abs_distance]
+        return combined_gradients,Correctly_classified
 
-    """
     def get_results_vanilla_gradient(self,Task_Text,Task_Result):
         # Prepare Input
         Task_Result_Token,Task_Text_Tokens=self.Prepare_Input(Task_Text,Task_Result)
@@ -389,14 +378,14 @@ class LLM_remote:
         self.backward_pass(loss)
 
         # Prepare outputs
-        if  self.is_correctly_classified(Task_Result_Token,Model_output.logits[0][-1]):
+        if Task_Result_Token==torch.argmax(Model_output.logits[0][-1]).item():
             Correctly_classified=1
         else:
             Correctly_classified=0
         Gradients=self.tensors_to_lists(self.extracted_outputs)
 
         return Gradients,Correctly_classified
-    """
+
 
 
     def get_results_hidden_Representation(self,Task_Text,Task_Result):
@@ -408,7 +397,11 @@ class LLM_remote:
             Model_output=self.forward_pass(Task_Text_Tokens)
 
             # Prepare outputs
-            Correctly_classified=self.is_correctly_classified(Task_Result_Token,Model_output.logits[0][-1])
+            if Task_Result_Token==torch.argmax(Model_output.logits[0][-1]).item():
+                Correctly_classified=1
+            else:
+                Correctly_classified=0
+
         return self.tensors_to_lists(self.extracted_outputs,Gradient_Ex=False),Correctly_classified
 
     def create_nested_dict(self,attributions, layers_to_hook_name_list):
@@ -478,11 +471,9 @@ class LLM_remote:
 
         return att_dict,0
 
-    def get_results_captum(self,Task_Text,Task_Result):
+    def get_results_captum(self,Task_Text,Task_Result,needs_baseline):
         # Prepare Input
         #Task_Result_Token,Task_Text_Tokens=self.Prepare_Input(Task_Text,Task_Result)
-        #print(Task_Text)
-        #print(self.captum_tokenizer)
         inp = captum.attr.TextTokenInput(
             Task_Text,
             self.captum_tokenizer
@@ -509,6 +500,8 @@ class LLM_remote:
         elif self.Relevance_Map_Method=='hiddenFeatures':
             result = self.get_results_hidden_Representation(Task_Text,Task_Result)
         elif self.Relevance_Map_Method=="captum-GradientXActivation":
+            result=self.get_results_captum(Task_Text,Task_Result)
+        elif self.Relevance_Map_Method=="captum-GradientShap":
             result=self.get_results_captum(Task_Text,Task_Result)
         elif self.Relevance_Map_Method=="captum-IntegratedGradients":
             result=self.get_results_captum(Task_Text,Task_Result)

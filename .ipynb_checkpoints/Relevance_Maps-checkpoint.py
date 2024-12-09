@@ -40,7 +40,7 @@ class Relevance_Map(Prediction_Helpers.Prediction_Helper):
 
         self.model_id=model_id
         
-        self.Baseline_Methods=["captum-IntegratedGradients"]
+        self.Baseline_Methods=["captum-GradientShap"]
         self.Actually_Supported_Relevance_Map_Methods=self.Baseline_Methods+['vanilla_gradient','smoothGrad','captum-GradientXActivation']
         if Relevance_Map_Method not in self.Actually_Supported_Relevance_Map_Methods:
             raise Exception("Relevance_Map_Method "+str(Relevance_Map_Method)+" is not supported in this Version.")
@@ -66,12 +66,11 @@ class Relevance_Map(Prediction_Helpers.Prediction_Helper):
         self.num_gpus=num_gpus
         self.num_cpus=num_cpus
 
-        self.Baselines=0
+        self.Baselines=None
 
         self.Random_Offset=20275043
 
-
-        """
+        
         if self.Actually_Supported_Relevance_Map_Methods in self.Baseline_Methods:
             
             num_samples=math.ceil(num_baselines/2)
@@ -87,7 +86,6 @@ class Relevance_Map(Prediction_Helpers.Prediction_Helper):
                 for ac_sample_point in len(ac_task.Test_Samples):
                     test_sample=ac_task.get_Train_Sample(ac_sample_point)
                     self.Baselines.append(test_sample[0])
-        """
 
 
     def Check_Interim_Results_Folder(self):
@@ -102,7 +100,6 @@ class Relevance_Map(Prediction_Helpers.Prediction_Helper):
         self.Metadata={}
         ac_url=self.interim_results_path+self.task_1.Task_Name
         all_files=self.safe_listdir(ac_url)
-        print(ac_url)
         if  all_files is not None and 'Metadata.json' in all_files:
             with open(ac_url+'/Metadata.json', 'r') as file:
                 self.Metadata[self.task_1.Task_Name] = json.load(file)
@@ -110,7 +107,6 @@ class Relevance_Map(Prediction_Helpers.Prediction_Helper):
             self.Metadata[self.task_1.Task_Name]={}
             self.Metadata[self.task_1.Task_Name]["Computed"]=0
             self.Metadata[self.task_1.Task_Name]["Accuracy"]=0
-            self.Metadata[self.task_1.Task_Name]["Abs_dist"]=0
 
         ac_url=self.interim_results_path+self.task_2.Task_Name
         all_files=self.safe_listdir(ac_url)
@@ -121,7 +117,6 @@ class Relevance_Map(Prediction_Helpers.Prediction_Helper):
             self.Metadata[self.task_2.Task_Name]={}
             self.Metadata[self.task_2.Task_Name]["Computed"]=0
             self.Metadata[self.task_2.Task_Name]["Accuracy"]=0
-            self.Metadata[self.task_2.Task_Name]["Abs_dist"]=0
 
 
     def Save_Interim_Results(self):
@@ -330,9 +325,7 @@ class Relevance_Map(Prediction_Helpers.Prediction_Helper):
         for key_1 in ac_mean[self.task_1.Task_Name]:
             ret_val[key_1]={}
             for key_2 in ac_mean[self.task_1.Task_Name][key_1]:
-                #print(type(ac_mean[self.task_1.Task_Name][key_1][key_2]))
-                #exit()
-                if isinstance(ac_mean[self.task_1.Task_Name][key_1][key_2], torch.Tensor) or isinstance(ac_mean[self.task_1.Task_Name][key_1][key_2], np.ndarray):
+                if isinstance(ac_mean[self.task_1.Task_Name][key_1][key_2], torch.Tensor):
                     ret_val[key_1][key_2]=self.Compute_Relevance_Map_Relation(
                         ac_mean[self.task_1.Task_Name][key_1][key_2],
                         ac_mean[self.task_2.Task_Name][key_1][key_2],
@@ -389,8 +382,7 @@ class Relevance_Map(Prediction_Helpers.Prediction_Helper):
 
             Gradients,Correctly_classified=self.Get_Results(Task_Text,Task_Result)
 
-            self.Metadata[actual_task_key]['Accuracy']+=Correctly_classified[0]
-            self.Metadata[actual_task_key]['Abs_dist']+=Correctly_classified[1]
+            self.Metadata[actual_task_key]['Accuracy']+=Correctly_classified
             #print("*"*100)
             #print(Correctly_classified)
             #print(Gradients)

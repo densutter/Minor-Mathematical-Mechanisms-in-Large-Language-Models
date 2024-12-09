@@ -22,8 +22,8 @@ import seaborn as sns
 #Use_Context=True
 
 Testing_Samples=100
-Task_1=LLM_Tasks.Regression_Task_Int(None,Display_Context=False)
-Task_2=LLM_Tasks.Multiclass_Logistic_Regression_Task(None,Display_Context=False)
+Task_1=LLM_Tasks.Regression_Task_Int(None,Display_Context=False,Task_Name="Task1")
+Task_2=LLM_Tasks.Regression_Task_Int(None,Display_Context=False,Task_Name="Task2")
 Task_1_Name=Task_1.Task_Name
 Task_2_Name=Task_2.Task_Name
 Interim_Results_URL='./interim_results/'
@@ -250,7 +250,7 @@ print("[INFO] Step 1: Generate Heatmaps for Relevance Maps")
 
 RelMap=Relevance_Maps.Relevance_Map(
     None,
-    "captum-GradientXActivation",
+    "vanilla_gradient",
     Task_1,
     Task_2,
     None,

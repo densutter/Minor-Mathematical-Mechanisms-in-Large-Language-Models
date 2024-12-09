@@ -4,39 +4,23 @@ import Probing
 from transformers import AutoTokenizer
 import torch
 torch.set_num_threads(6)
-import numpy as np
 
 #Hyperparameters:
-model_id = "Local-Meta-Llama-3.2-3B" #"Local-Meta-Llama-3.2-1B"
-Relevance_Map_Method="vanilla_gradient" #'smoothGrad'
+model_id = "meta-llama/Llama-3.2-1B" #"Local-Meta-Llama-3.2-1B"
+Relevance_Map_Method='captum-GradientXActivation' #'smoothGrad'
 Probing_Method='Probing'
 tokenizer = AutoTokenizer.from_pretrained(model_id)
 Use_Context=True
-Testing_Samples=40
+Testing_Samples=100
 
 
 #Step 1: Select Tasks
 print("[INFO] Step 1: Prepare Tasks")
+Task_1=LLM_Tasks.Regression_Task_Int(tokenizer,Display_Context=Use_Context)
+Task_2=LLM_Tasks.Multiclass_Logistic_Regression_Task(tokenizer,Display_Context=Use_Context)
 
-original_list = list(range(23))
-
-# Shuffle the list randomly
-np.random.shuffle(original_list)
-
-# If the length is odd, ignore the last element
-if len(original_list) % 2 != 0:
-    original_list = original_list[:-1]
-
-# Split into two equal parts
-half_size = len(original_list) // 2
-array1 = original_list[:half_size]
-array2 = original_list[half_size:]
-
-Task_1=LLM_Tasks.Multiclass_Logistic_Regression_Task(tokenizer,Display_Context=Use_Context,max_examples_token_length=300,number_range_weights=array1,Task_Name="Task1")
-Task_2=LLM_Tasks.Multiclass_Logistic_Regression_Task(tokenizer,Display_Context=Use_Context,max_examples_token_length=300,number_range_weights=array2,Task_Name="Task2")
-
-Task_1_Test=LLM_Tasks.Multiclass_Logistic_Regression_Task(tokenizer,Display_Context=Use_Context,Testing_samples_num=Testing_Samples,max_examples_token_length=300,number_range_weights=array1,Task_Name="Task1")
-Task_2_Test=LLM_Tasks.Multiclass_Logistic_Regression_Task(tokenizer,Display_Context=Use_Context,Testing_samples_num=Testing_Samples,max_examples_token_length=300,number_range_weights=array2,Task_Name="Task2")
+Task_1_Test=LLM_Tasks.Regression_Task_Int(tokenizer,Display_Context=Use_Context,Testing_samples_num=Testing_Samples)
+Task_2_Test=LLM_Tasks.Multiclass_Logistic_Regression_Task(tokenizer,Display_Context=Use_Context,Testing_samples_num=Testing_Samples)
 print("[INFO] Step 1: Finsished")
 
 
@@ -51,11 +35,10 @@ RelMap=Relevance_Maps.Relevance_Map(
     Allowed_Model_Usage_Before_Refresh=10,
     max_memory='cpu',
     num_gpus=0,
-    num_cpus=52
+    num_cpus=6
 )
 Rel_Map_Result=RelMap.Get_Relevance_Map(Number_of_samples=100)
 print("[INFO] Step 2: Finished")
-
 
 
 #Step 3: Use relevance map for probing
@@ -70,15 +53,14 @@ MyProbing=Probing.Probing(
     Testing_Samples,
     probing_layers=1,
     Allowed_Model_Usage_Before_Refresh=200,
-    max_memory="cpu", #{0: "10GiB", "cpu": "30GiB"},
-    num_gpus=0,
-    num_cpus=52
+    max_memory={0: "10GiB", "cpu": "30GiB"},
+    num_gpus=1,
+    num_cpus=10
 )
 MyProbing.Get_Probing_Results(Number_of_samples=2000)
 print("[INFO] Step 3: Finished")
 
 
-"""
 #Step 4: Use relevance map for probing
 print("[INFO] Step 4: Probing with 2 Layers")
 MyProbing=Probing.Probing(
@@ -97,4 +79,3 @@ MyProbing=Probing.Probing(
 )
 MyProbing.Get_Probing_Results(Number_of_samples=2000)
 print("[INFO] Step 4: Finished")
-"""
