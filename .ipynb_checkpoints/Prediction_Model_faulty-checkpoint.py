@@ -4,7 +4,7 @@ from transformers import AutoModelForCausalLM, AutoTokenizer
 import torch
 from accelerate import init_empty_weights, infer_auto_device_map
 import warnings
-from torch.cuda.amp import autocast
+from torch.cuda.amp import autocast, GradScaler
 import gc
 import captum
 import copy
@@ -37,8 +37,9 @@ class ModelWrapper:
         return outputs.logits
 
 class LLM_remote:
-    def __init__(self,model_id,max_memory,tokenizer,Relevance_Map_Method,Baselines,SG_iterations=10):
+    def __init__(self,model_id,GPU_Savings,max_memory,tokenizer,Relevance_Map_Method,Baselines,SG_iterations=10):
         self.model_id = model_id
+        self.GPU_Savings=GPU_Savings
         self.max_memory=max_memory #Example: {0: "14GiB", "cpu": "30GiB"}
         self.tokenizer = tokenizer
         self.captum_tokenizer = None
@@ -55,6 +56,8 @@ class LLM_remote:
         
         # Step 2: Initialize Model
         self.model = AutoModelForCausalLM.from_pretrained(model_id,device_map=self.device_map)
+        if self.GPU_Savings:
+            self.model.gradient_checkpointing_enable()
         self.model_device=next(self.model.parameters()).device
         self.model_captum=None
         self.model_wrapped=None
@@ -156,27 +159,42 @@ class LLM_remote:
 
 
     def forward_pass(self,Task_Text_Tokens,Result_Target=None,Use_Captum=False):
-
-        if Use_Captum:
-            if self.needs_baseline:
-                M_outputs = self.model_captum.attribute(Task_Text_Tokens,self=self.Baselines,target=Result_Target)
-            else:
-                M_outputs = self.model_captum.attribute(Task_Text_Tokens, target=Result_Target)
+        #Forward Pass
+        if self.GPU_Savings:
+            with torch.autograd.graph.save_on_cpu(): #Optimized for GPU Memory savings
+                with autocast():
+                    if Use_Captum:
+                        if self.needs_baseline:
+                            #print(Task_Text_Tokens)
+                            #print(Result_Target)
+                            M_outputs = self.model_captum.attribute(Task_Text_Tokens, baselines=self.Baselines,target=Result_Target)
+                        else:
+                            M_outputs = self.model_captum.attribute(Task_Text_Tokens, target=Result_Target)
+                    else:
+                        M_outputs = self.model(**Task_Text_Tokens)
         else:
-            M_outputs = self.model(**Task_Text_Tokens)
+            if Use_Captum:
+                if self.needs_baseline:
+                    M_outputs = self.model_captum.attribute(Task_Text_Tokens,self=self.Baselines,target=Result_Target)
+                else:
+                    M_outputs = self.model_captum.attribute(Task_Text_Tokens, target=Result_Target)
+            else:
+                M_outputs = self.model(**Task_Text_Tokens)
 
         return M_outputs
 
 
     def backward_pass(self,loss):
         self.model.zero_grad()
-        loss.backward()
+        if self.GPU_Savings or (isinstance(self.max_memory, str) and self.device_map!="cpu"):
+            GradScaler().scale(loss).backward()
+        else:
+            loss.backward()
 
 
     def tensors_to_lists(self,data,Gradient_Ex=True): #Helper function which ensures the detachment of the gradient
         if isinstance(data, torch.Tensor):  # Check if it's a tensor
             if Gradient_Ex:
-                #print(data.grad)
                 return data.grad.cpu().numpy()
             else:
                 return data.cpu().detach().numpy()
@@ -208,11 +226,11 @@ class LLM_remote:
         if isinstance(data, torch.Tensor):  # Check if it's a tensor
             return data.cpu().numpy()
         elif isinstance(data, dict):  # If it's a dictionary, recursively check its values
-            return {key: self.helper_hiden_rep(value) for key, value in data.items()}
+            return {key: self.helper_grad(value) for key, value in data.items()}
         elif isinstance(data, list):  # If it's a list, recursively check each element
-            return [self.helper_hiden_rep(item) for item in data]
+            return [self.helper_grad(item) for item in data]
         elif isinstance(data, tuple):  # If it's a tuple, recursively check each element
-            return tuple(self.helper_hiden_rep(item) for item in data)
+            return tuple(self.helper_grad(item) for item in data)
         else:
             return data  # If it's not a tensor, return it as-is
 
@@ -495,5 +513,5 @@ class LLM_remote:
 
 
 # Instantiate with dynamic num_gpus setting
-def create_llm_remote(model_id, max_memory, tokenizer,Relevance_Map_Method,Baselines,num_gpus=0,num_cpus=1):
-    return ray.remote(LLM_remote).options(num_gpus=num_gpus,num_cpus=num_cpus).remote(model_id, max_memory,tokenizer,Relevance_Map_Method,Baselines)
+def create_llm_remote(model_id, GPU_Savings, max_memory, tokenizer,Relevance_Map_Method,Baselines,num_gpus=0,num_cpus=1):
+    return ray.remote(LLM_remote).options(num_gpus=num_gpus,num_cpus=num_cpus).remote(model_id, GPU_Savings, max_memory,tokenizer,Relevance_Map_Method,Baselines)

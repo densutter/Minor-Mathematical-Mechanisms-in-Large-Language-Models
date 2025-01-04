@@ -31,6 +31,7 @@ class Relevance_Map(Prediction_Helpers.Prediction_Helper):
         tokenizer,
         interim_results_folder='./interim_results/',
         verbose=True,
+        GPU_Savings=True,
         Allowed_Model_Usage_Before_Refresh=1,
         max_memory="cpu",
         num_gpus=0,
@@ -55,6 +56,7 @@ class Relevance_Map(Prediction_Helpers.Prediction_Helper):
         self.Metadata=None
         self.Load_Interim_Results()
         self.verbose=verbose
+        self.GPU_Savings=GPU_Savings
         self.tokenizer=tokenizer
 
         #It is likely that there is some memory leakage.Therefore the model gets deleted all Allowed_Model_Usage_Before_Refresh iterations to clean up the memory
@@ -389,7 +391,6 @@ class Relevance_Map(Prediction_Helpers.Prediction_Helper):
             self.Metadata[actual_task_key]['Computed']=self.Metadata[actual_task_key]['Computed']+1
 
             Gradients,Correctly_classified=self.Get_Results(Task_Text,Task_Result)
-            #print(Gradients)
 
             self.Metadata[actual_task_key]['Accuracy']+=Correctly_classified[0]
             self.Metadata[actual_task_key]['Abs_dist']+=Correctly_classified[1]
