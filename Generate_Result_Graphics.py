@@ -100,15 +100,15 @@ def analyze_data(input_data_structure, test_loss_num):
                     for keep_percentage in keep_percentages:
                         #print(output_version[0])
                         top_loss_values = output_version[0][keep_percentage][-test_loss_num:]
-                        bottom_loss_values = output_version[1][keep_percentage][-test_loss_num:]
 
 
                         # Compute means, variances, and differences                        
                         metrics["mean_top_keep_"+keep_percentage] = np.mean(top_loss_values)
-                        metrics["mean_bottom_keep_"+keep_percentage] = np.mean(bottom_loss_values)
                         metrics["variance_top_keep_"+keep_percentage] = np.var(top_loss_values)
-                        metrics["variance_bottom_keep_"+keep_percentage] = np.var(bottom_loss_values)
                         if keep_percentage != "1":
+                            bottom_loss_values = output_version[1][keep_percentage][-test_loss_num:]
+                            metrics["mean_bottom_keep_"+keep_percentage] = np.mean(bottom_loss_values)
+                            metrics["variance_bottom_keep_"+keep_percentage] = np.var(bottom_loss_values)
                             # Mean difference
                             top_mean = np.mean(top_loss_values)
                             bottom_mean = np.mean(bottom_loss_values)
@@ -137,9 +137,11 @@ def Make_Heatmap_Probing_Helper(probing_results,probing_results_url):
                 ac_depth=len(probing_results[intermed_var][layer_name][output_version_idx]) 
                 for keep_percentage in keep_percentages:
                     mean["top"][keep_percentage]=[None]*ac_depth
-                    mean["bottom"][keep_percentage]=[None]*ac_depth
+                    if keep_percentage != "1":
+                        mean["bottom"][keep_percentage]=[None]*ac_depth
                     vari["top"][keep_percentage]=[None]*ac_depth
-                    vari["bottom"][keep_percentage]=[None]*ac_depth
+                    if keep_percentage != "1":
+                        vari["bottom"][keep_percentage]=[None]*ac_depth
                 
                 differe={}
                 p_value={}
@@ -169,7 +171,10 @@ def Make_Heatmap_Probing_Helper(probing_results,probing_results_url):
 
                 plot_x_axis=list(range(ac_depth))
                 for per in keep_percentages:
-                    for tb in ["top","bottom"]:
+                    available=["top"]
+                    if per != "1":
+                        available.append("bottom")
+                    for tb in available:
                         
                         plot_y_axis.append(per+"-"+tb)
                         

@@ -275,6 +275,8 @@ class Relevance_Map(Prediction_Helpers.Prediction_Helper):
         return result_dict
 
     def Preprocess_Gradient(self,acGrad):
+        print(acGrad.device)
+        acGrad=acGrad.cpu().numpy()
         acGrad=np.abs(acGrad)
         acGrad=np.mean(acGrad, axis=0)
         return acGrad
@@ -290,7 +292,7 @@ class Relevance_Map(Prediction_Helpers.Prediction_Helper):
                 A = acGrad_Dict[key1][key2]
 
                 # Check if the values are single numpy arrays
-                if isinstance(A, np.ndarray):
+                if torch.is_tensor(A):
                     if len(A.shape)==3:
                         A=A[0]
                     A=self.Preprocess_Gradient(A)

@@ -6,6 +6,7 @@ from transformers import AutoTokenizer
 import torch
 import numpy as np
 from collections import OrderedDict
+import gc
 
 #Hyperparameters:
 Relevance_Steps=100
@@ -150,7 +151,7 @@ RelMap=Relevance_Maps.Relevance_Map(
     Task_1,
     Task_2,
     tokenizer,
-    Allowed_Model_Usage_Before_Refresh=10,
+    Allowed_Model_Usage_Before_Refresh=100,
     max_memory=max_memory,
     num_gpus=num_gpus,
     num_cpus=num_cpus
@@ -171,15 +172,14 @@ MyProbing=Probing.Probing(
     Rel_Map_Result,
     Testing_Samples,
     probing_layers=1,
-    Allowed_Model_Usage_Before_Refresh=200,
+    Allowed_Model_Usage_Before_Refresh=2000,
     max_memory=max_memory,
-    probing_device="cuda:2",
     num_gpus=num_gpus,
     num_cpus=num_cpus
 )
 MyProbing.Get_Probing_Results(Number_of_samples=Probing_Steps)
 print("[INFO] Step 3: Finished")
-MyProbing=None
+
 
 """
 #Step 4: Use relevance map for probing
@@ -225,7 +225,7 @@ for actasks in tasksettings:
             actasks[1],
             tokenizer,
             Rel_Map_Result,
-            Allowed_Model_Usage_Before_Refresh=10,
+            Allowed_Model_Usage_Before_Refresh=100,
             max_memory=max_memory,
             num_gpus=num_gpus,
             num_cpus=num_cpus
