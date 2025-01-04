@@ -1,4 +1,3 @@
-import ray
 import transformers
 from transformers import AutoModelForCausalLM, AutoTokenizer
 import torch
@@ -177,9 +176,9 @@ class LLM_remote:
         if isinstance(data, torch.Tensor):  # Check if it's a tensor
             if Gradient_Ex:
                 #print(data.grad)
-                return data.grad.cpu().numpy()
+                return data.grad.detach()
             else:
-                return data.cpu().detach().numpy()
+                return data.detach()
         elif isinstance(data, dict):  # If it's a dictionary, recursively check its values
             return {key: self.tensors_to_lists(value,Gradient_Ex) for key, value in data.items()}
         elif isinstance(data, list):  # If it's a list, recursively check each element
@@ -203,7 +202,7 @@ class LLM_remote:
             return tuple(self.helper_grad(item) for item in data)
         else:
             return data  # If it's not a tensor, return it as-is
-
+    """
     def helper_hiden_rep(self,data): #Helper function which ensures that gradients are saved
         if isinstance(data, torch.Tensor):  # Check if it's a tensor
             return data.cpu().numpy()
@@ -215,13 +214,13 @@ class LLM_remote:
             return tuple(self.helper_hiden_rep(item) for item in data)
         else:
             return data  # If it's not a tensor, return it as-is
-
+    """
 
     def create_hook_fn_hidden_features(self,layer_name,layer_index):
         def hook_fn(module, input, output):
             if layer_name not in self.extracted_outputs:
                 self.extracted_outputs[layer_name] = {}
-            self.extracted_outputs[layer_name][layer_index]=self.helper_hiden_rep(output)
+            self.extracted_outputs[layer_name][layer_index]=output
         return hook_fn
 
 
@@ -297,16 +296,16 @@ class LLM_remote:
             if Ac_Layer_Index not in combined_gradients[Layer_Name]:
                 combined_gradients[Layer_Name][Ac_Layer_Index]=[]
                 for aet in self.extracted_outputs[Layer_Name][Ac_Layer_Index]:
-                    combined_gradients[Layer_Name][Ac_Layer_Index].append(aet.grad.cpu().detach().numpy())
+                    combined_gradients[Layer_Name][Ac_Layer_Index].append(aet.grad.detach())
             else:
                 for p_aet,aet in enumerate(self.extracted_outputs[Layer_Name][Ac_Layer_Index]):
-                    combined_gradients[Layer_Name][Ac_Layer_Index][p_aet]+=aet.grad.cpu().detach().numpy()
+                    combined_gradients[Layer_Name][Ac_Layer_Index][p_aet]+=aet.grad.detach()
 
         else:
             if Ac_Layer_Index not in combined_gradients[Layer_Name]:
-                combined_gradients[Layer_Name][Ac_Layer_Index]=self.extracted_outputs[Layer_Name][Ac_Layer_Index].grad.cpu().detach().numpy()
+                combined_gradients[Layer_Name][Ac_Layer_Index]=self.extracted_outputs[Layer_Name][Ac_Layer_Index].grad.detach()
             else:
-                combined_gradients[Layer_Name][Ac_Layer_Index]+=self.extracted_outputs[Layer_Name][Ac_Layer_Index].grad.cpu().detach().numpy()
+                combined_gradients[Layer_Name][Ac_Layer_Index]+=self.extracted_outputs[Layer_Name][Ac_Layer_Index].grad.detach()
 
         return combined_gradients
 
@@ -495,5 +494,5 @@ class LLM_remote:
 
 
 # Instantiate with dynamic num_gpus setting
-def create_llm_remote(model_id, max_memory, tokenizer,Relevance_Map_Method,Baselines,num_gpus=0,num_cpus=1):
-    return ray.remote(LLM_remote).options(num_gpus=num_gpus,num_cpus=num_cpus).remote(model_id, max_memory,tokenizer,Relevance_Map_Method,Baselines)
+def create_llm_remote(model_id, max_memory, tokenizer,Relevance_Map_Method,Baselines):
+    return LLM_remote(model_id, max_memory,tokenizer,Relevance_Map_Method,Baselines)

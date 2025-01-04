@@ -187,6 +187,18 @@ def Make_Heatmap_Probing_Helper(probing_results,probing_results_url):
                 sns.heatmap(mean_plot_data,cmap='icefire', center=0,xticklabels=plot_x_axis, yticklabels=plot_y_axis)
                 plt.savefig(probing_results_url+'/Mean_Heatmap_'+intermed_var+"-"+layer_name+'_'+str(output_version_idx)+'.png',bbox_inches='tight')
                 plt.close()
+                if intermed_var=="Weights":
+                    fig = plt.gcf()  # Get the current figure
+                    fig.set_size_inches(18, 8)  # Set the size in inches
+                    for i, data in enumerate(mean_plot_data):
+                        plt.plot(data, label=plot_y_axis[i])
+                    plt.axhline((23**2)/12, color='green', linestyle='--', label='Variance of Uniform Distribution (Random)')  # Add horizontal dotted line
+                    plt.title('Loss of probing')
+                    plt.xlabel('layer depth')
+                    plt.ylabel('testing loss')
+                    plt.legend(loc='upper left', bbox_to_anchor=(1.05, 1), borderaxespad=0.)
+                    plt.savefig(probing_results_url+'/Mean_Linegraph_'+intermed_var+"-"+layer_name+'_'+str(output_version_idx)+'.png', bbox_inches='tight')
+                    plt.close()
                 
                 fig = plt.gcf()  # Get the current figure
                 fig.set_size_inches(18, 8)  # Set the size in inches

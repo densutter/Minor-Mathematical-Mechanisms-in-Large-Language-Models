@@ -1,4 +1,3 @@
-import ray
 import transformers
 from transformers import AutoModelForCausalLM, AutoTokenizer
 import torch
@@ -495,5 +494,5 @@ class LLM_remote:
 
 
 # Instantiate with dynamic num_gpus setting
-def create_llm_remote(model_id, max_memory, tokenizer,Relevance_Map_Method,Baselines,num_gpus=0,num_cpus=1):
-    return ray.remote(LLM_remote).options(num_gpus=num_gpus,num_cpus=num_cpus).remote(model_id, max_memory,tokenizer,Relevance_Map_Method,Baselines)
+def create_llm_remote(model_id, max_memory, tokenizer,Relevance_Map_Method,Baselines):
+    return LLM_remote(model_id, max_memory,tokenizer,Relevance_Map_Method,Baselines)

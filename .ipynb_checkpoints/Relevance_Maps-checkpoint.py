@@ -12,7 +12,6 @@ import json
 import Prediction_Model
 import Prediction_Helpers
 import numpy as np
-import ray
 import gc
 import copy
 import math
@@ -275,6 +274,8 @@ class Relevance_Map(Prediction_Helpers.Prediction_Helper):
         return result_dict
 
     def Preprocess_Gradient(self,acGrad):
+        #print(acGrad.device)
+        acGrad=acGrad.cpu().numpy()
         acGrad=np.abs(acGrad)
         acGrad=np.mean(acGrad, axis=0)
         return acGrad
@@ -290,7 +291,7 @@ class Relevance_Map(Prediction_Helpers.Prediction_Helper):
                 A = acGrad_Dict[key1][key2]
 
                 # Check if the values are single numpy arrays
-                if isinstance(A, np.ndarray):
+                if torch.is_tensor(A):
                     if len(A.shape)==3:
                         A=A[0]
                     A=self.Preprocess_Gradient(A)
@@ -419,6 +420,8 @@ class Relevance_Map(Prediction_Helpers.Prediction_Helper):
 
             #Save Metadata
             self.Save_Interim_Results()
-
-        ray.shutdown()
+        del self.model_handler
+        gc.collect()
+        torch.cuda.empty_cache()
+        gc.collect()
         return self.Compute_Relevance_Map(Gradient_Means,Gradient_Variance)

@@ -4,7 +4,6 @@ from torch import optim
 import Prediction_Helpers
 import Prediction_Model
 import torch
-import ray
 import numpy as np
 import json
 import os
@@ -543,13 +542,17 @@ class Probing(Prediction_Helpers.Prediction_Helper):
                     actual_task_key=actual_task.Task_Name
                     Task_Text,Task_Result,Intermediate_Variables=actual_task.get_Train_Sample(test_idx)
                     Hidden_Features,_=self.Get_Results(Task_Text,Task_Result)
-                    self.Train_Probing_Models(
-                        Hidden_Features,
-                        Intermediate_Variables,
-                        actual_task,
-                        ac_Models,
-                        ac_Optimizers
-                    )
+                    for ac_batch_elem in Settings_batches:
+                        self.ac_combi=ac_batch_elem[0]
+                        ac_Models=ac_batch_elem[1]
+                        ac_Optimizers=ac_batch_elem[2]
+                        self.Train_Probing_Models(
+                            Hidden_Features,
+                            Intermediate_Variables,
+                            actual_task,
+                            ac_Models,
+                            ac_Optimizers
+                        )
                 Tasks_done[0]+=1
                 Tasks_done[1]+=1
             self.Save_Metadata()
@@ -563,6 +566,9 @@ class Probing(Prediction_Helpers.Prediction_Helper):
     def Get_Probing_Results(self,Number_of_samples):
         if self.Probing_Map_Method=="Probing":
             self.Get_Probing(Number_of_samples)
-        ray.shutdown()
+        del self.model_handler
+        gc.collect()
+        torch.cuda.empty_cache()
+        gc.collect()
         
         

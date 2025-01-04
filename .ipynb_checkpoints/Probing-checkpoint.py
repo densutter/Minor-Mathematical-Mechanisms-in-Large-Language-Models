@@ -4,11 +4,11 @@ from torch import optim
 import Prediction_Helpers
 import Prediction_Model
 import torch
-import ray
 import numpy as np
 import json
 import os
 from TimeMeasurer import TimeMeasurer
+import gc
 
 class Probing_Model_Attention(nn.Module):
     def __init__(self, input_dim, output_dim, max_tokens, projection_dim=512, hidden_dim=512, num_layers=1):
@@ -52,7 +52,8 @@ class Probing_Model_Attention(nn.Module):
         Returns:
         torch.Tensor: Output tensor of shape (projection_dim).
         """
-        #print(values.dtype)
+        #print(values)
+        #print(values.shape)
         tokens, in_dim = values.shape
         assert in_dim == self.input_dim, \
             f"Expected values to have shape (tokens, {self.input_dim}), but got {values.shape}"
@@ -93,11 +94,11 @@ class Probing(Prediction_Helpers.Prediction_Helper):
         verbose=True,
         Allowed_Model_Usage_Before_Refresh=10, 
         max_memory="cpu", 
-        probing_device="cpu",
         num_gpus=0,
         num_cpus=1,
         Max_tokens=400,
-        learning_rate=0.001
+        learning_rate=0.001,
+        layers_per_run=40
         ):
 
         self.model_id=model_id
@@ -137,13 +138,66 @@ class Probing(Prediction_Helpers.Prediction_Helper):
         self.Unsaved_steps=0
         self.probing_layers=probing_layers
         self.ac_combi=None
-        self.probing_device=probing_device
 
         self.Example_Input,_=self.Get_Results("test","0")
+        self.Example_Input = self.tensor_to_list(self.Example_Input,self.relevance_map)
+        #print(self.Example_Input )
+        #exit()
         self.TimeMeasurer=TimeMeasurer()
+        self.layers_per_run=layers_per_run
 
 
+
+    def prepare_selective_mask(self, Masking_Arr):
+        res_dict={}
+        for keep in self.Splittance:
+            if keep>=1:
+                res_dict[keep]=len(Masking_Arr)
+                continue
+            Masking_Arr=np.array(Masking_Arr)
+            
+            input_dim = Masking_Arr.shape[0]
+            
+            # Calculate the number of top/bottom indices to keep
+            keep_count = int(np.ceil(keep * input_dim))
         
+            # Get the indices of dimensions with highest and lowest values in Masking_Arr
+            sorted_indices = np.argsort(Masking_Arr)  # Sort Masking_Arr to find the min and max indices
+            #print(sorted_indices)
+            top_indices = sorted_indices[-keep_count:]  # Top 'keep_count' indices (highest Masking_Arr values)
+            bottom_indices = sorted_indices[:keep_count]  # Bottom 'keep_count' indices (lowest Masking_Arr values)
+            res_dict[keep]=[top_indices,bottom_indices]
+        return res_dict
+
+    def tensor_to_list(self,dict1,dict2):
+        if isinstance(dict1, torch.Tensor):
+            # Replace tensor with list: ["T", tensor.size(), tensor.device]
+            return ["T", self.prepare_selective_mask(dict2) , str(dict1.device)]
+        
+        elif isinstance(dict1, dict):
+            # Recurse through dictionary values
+            ac_dict={}
+            for ackey in dict1:
+                ac_dict[ackey]=self.tensor_to_list(dict1[ackey],dict2[ackey])
+            return ac_dict
+        
+        elif isinstance(dict1, list):
+            # Recurse through list items
+            ac_list=[]
+            for acpos in range(len(dict1)):
+                ac_list.append(self.tensor_to_list(dict1[acpos],dict2[acpos]))
+            return ac_list
+        
+        elif isinstance(dict1, tuple):
+            ac_list=[]
+            for acpos in range(len(dict1)):
+                ac_list.append(self.tensor_to_list(dict1[acpos],dict2[acpos]))
+            return tuple(ac_list)
+        
+        else:
+            raise ValueError("Something is wrong with the dict")
+            
+            
        
 
     def Save_Metadata(self):
@@ -173,33 +227,14 @@ class Probing(Prediction_Helpers.Prediction_Helper):
 
     
 
-    def selective_keep(self, Input_Arr, Masking_Arr, keep):
-        # Get the number of dimensions
-        #print(Input_Arr.shape)
-        #print(Masking_Arr)
-        Masking_Arr=np.array(Masking_Arr)
-        Input_Arr=Input_Arr[0]
 
-        #print( Input_Arr.shape,Masking_Arr.shape)
-        if Input_Arr.shape[1] != Masking_Arr.shape[0]:
-            raise ValueError("The second dimension of Input_Arr must match the size of Masking_Arr.")
 
-        
-        input_dim = Masking_Arr.shape[0]
-        
-        # Calculate the number of top/bottom indices to keep
-        keep_count = int(np.ceil(keep * input_dim))
-    
-        # Get the indices of dimensions with highest and lowest values in Masking_Arr
-        sorted_indices = np.argsort(Masking_Arr)  # Sort Masking_Arr to find the min and max indices
-        #print(sorted_indices)
-        top_indices = sorted_indices[-keep_count:]  # Top 'keep_count' indices (highest Masking_Arr values)
-        bottom_indices = sorted_indices[:keep_count]  # Bottom 'keep_count' indices (lowest Masking_Arr values)
-    
+    def selective_keep(self, Input_Arr,masking):
         # Select the top and bottom values from Input_Arr for each token
-        top_values = Input_Arr[:, top_indices]
-        bottom_values = Input_Arr[:, bottom_indices]
-    
+        #print(Input_Arr)
+        #print(masking)
+        top_values = Input_Arr[:, masking[0]]
+        bottom_values = Input_Arr[:, masking[1]]
         return top_values, bottom_values
 
 
@@ -231,6 +266,7 @@ class Probing(Prediction_Helpers.Prediction_Helper):
         new_Models[self.task_2.Task_Name]={}
         new_Optimizers[self.task_1.Task_Name]={}
         new_Optimizers[self.task_2.Task_Name]={}
+        
 
         for key_1 in [self.task_1,self.task_2]:
             new_Models[key_1.Task_Name]={}
@@ -243,72 +279,86 @@ class Probing(Prediction_Helpers.Prediction_Helper):
                 if self.ac_combi[1] not in self.Metadata[key_1.Task_Name]["Loss"][key_2][self.ac_combi[0]]:
                     self.Metadata[key_1.Task_Name]["Loss"][key_2][self.ac_combi[0]][self.ac_combi[1]]={}
                 
-                if isinstance(self.Example_Input[self.ac_combi[0]][self.ac_combi[1]], np.ndarray): 
-                    
-                    example_input=self.selective_keep(
-                        self.Example_Input[self.ac_combi[0]][self.ac_combi[1]], 
-                        self.relevance_map[self.ac_combi[0]][self.ac_combi[1]], 
-                        keep)
-                    example_input=example_input[0].shape
+                if self.Example_Input[self.ac_combi[0]][self.ac_combi[1]][0]=='T': 
 
                     self.Metadata[key_1.Task_Name]["Loss"][key_2][self.ac_combi[0]][self.ac_combi[1]]=[]
                     self.Metadata[key_1.Task_Name]["Loss"][key_2][self.ac_combi[0]][self.ac_combi[1]].append({})
                     self.Metadata[key_1.Task_Name]["Loss"][key_2][self.ac_combi[0]][self.ac_combi[1]].append({})
+
+
+                    if isinstance(self.Example_Input[self.ac_combi[0]][self.ac_combi[1]][1][keep],int):
+                        new_Models[key_1.Task_Name][key_2]=[
+                            Probing_Model_Attention(
+                                self.Example_Input[self.ac_combi[0]][self.ac_combi[1]][1][keep], 
+                                np.size(Output[key_1.Task_Name][key_2]),
+                                self.Max_tokens, 
+                                num_layers=self.probing_layers
+                                ).to(self.Example_Input[self.ac_combi[0]][self.ac_combi[1]][2])
+                        ]
+                        new_Optimizers[key_1.Task_Name][key_2] = [
+                            optim.Adam(new_Models[key_1.Task_Name][key_2][0].parameters(), lr=self.learning_rate)
+                        ]
+                    else:
+                        new_Models[key_1.Task_Name][key_2]=[
+                            Probing_Model_Attention(
+                                len(self.Example_Input[self.ac_combi[0]][self.ac_combi[1]][1][keep][0]), 
+                                np.size(Output[key_1.Task_Name][key_2]),
+                                self.Max_tokens, 
+                                num_layers=self.probing_layers
+                                ).to(self.Example_Input[self.ac_combi[0]][self.ac_combi[1]][2]),
+                            Probing_Model_Attention(
+                                len(self.Example_Input[self.ac_combi[0]][self.ac_combi[1]][1][keep][1]), 
+                                np.size(Output[key_1.Task_Name][key_2]), 
+                                self.Max_tokens, 
+                                num_layers=self.probing_layers
+                            ).to(self.Example_Input[self.ac_combi[0]][self.ac_combi[1]][2])
+                        ]
                     
-                    new_Models[key_1.Task_Name][key_2]=[
-                        Probing_Model_Attention(
-                            example_input[1], 
-                            np.size(Output[key_1.Task_Name][key_2]),
-                            self.Max_tokens, 
-                            num_layers=self.probing_layers
-                            ).to(self.probing_device),
-                        Probing_Model_Attention(
-                            example_input[1], 
-                            np.size(Output[key_1.Task_Name][key_2]), 
-                            self.Max_tokens, 
-                            num_layers=self.probing_layers
-                        ).to(self.probing_device)
-                    ]
-                    
-                    new_Optimizers[key_1.Task_Name][key_2] = [
-                        optim.Adam(new_Models[key_1.Task_Name][key_2][0].parameters(), lr=self.learning_rate),
-                        optim.Adam(new_Models[key_1.Task_Name][key_2][1].parameters(), lr=self.learning_rate)
-                    ]
+                        new_Optimizers[key_1.Task_Name][key_2] = [
+                            optim.Adam(new_Models[key_1.Task_Name][key_2][0].parameters(), lr=self.learning_rate),
+                            optim.Adam(new_Models[key_1.Task_Name][key_2][1].parameters(), lr=self.learning_rate)
+                        ]
                              
                 else:
                     new_Models[key_1.Task_Name][key_2]=[None]*len(self.Example_Input[self.ac_combi[0]][self.ac_combi[1]])
                     new_Optimizers[key_1.Task_Name][key_2]=[None]*len(self.Example_Input[self.ac_combi[0]][self.ac_combi[1]])
                     for key_3 in range(len(self.Example_Input[self.ac_combi[0]][self.ac_combi[1]])):
                         
-                        example_input=self.selective_keep(
-                            self.Example_Input[self.ac_combi[0]][self.ac_combi[1]][key_3],
-                            self.relevance_map[self.ac_combi[0]][self.ac_combi[1]][key_3], 
-                            keep
-                        )
-                        
-                        example_input=example_input[0].shape   
                         self.Metadata[key_1.Task_Name]["Loss"][key_2][self.ac_combi[0]][self.ac_combi[1]][key_3]=[]
                         self.Metadata[key_1.Task_Name]["Loss"][key_2][self.ac_combi[0]][self.ac_combi[1]][key_3].append({})
                         self.Metadata[key_1.Task_Name]["Loss"][key_2][self.ac_combi[0]][self.ac_combi[1]][key_3].append({})
                         
-                        new_Models[key_1.Task_Name][key_2][key_3]=[
-                            Probing_Model_Attention(
-                                example_input[1], 
-                                np.size(Output[key_1.Task_Name][key_2]), 
-                                self.Max_tokens, 
-                                num_layers=self.probing_layers
-                            ).to(self.probing_device),
-                            Probing_Model_Attention(
-                                example_input[1], 
-                                np.size(Output[key_1.Task_Name][key_2]),
-                                self.Max_tokens, 
-                                num_layers=self.probing_layers
-                            ).to(self.probing_device)
-                        ]
-                        new_Optimizers[key_1.Task_Name][key_2][key_3]= [
-                            optim.Adam(new_Models[key_1.Task_Name][key_2][key_3][0].parameters(), lr=self.learning_rate),
-                            optim.Adam(new_Models[key_1.Task_Name][key_2][key_3][1].parameters(), lr=self.learning_rate)
-                        ]
+                        if isinstance(self.Example_Input[self.ac_combi[0]][self.ac_combi[1]][key_3][1][keep],int):
+                            new_Models[key_1.Task_Name][key_2][key_3]=[
+                                Probing_Model_Attention(
+                                    self.Example_Input[self.ac_combi[0]][self.ac_combi[1]][key_3][1][keep], 
+                                    np.size(Output[key_1.Task_Name][key_2]), 
+                                    self.Max_tokens, 
+                                    num_layers=self.probing_layers
+                                ).to(self.Example_Input[self.ac_combi[0]][self.ac_combi[1]][key_3][2])
+                            ]
+                            new_Optimizers[key_1.Task_Name][key_2][key_3]= [
+                                optim.Adam(new_Models[key_1.Task_Name][key_2][key_3][0].parameters(), lr=self.learning_rate)
+                            ]
+                        else:
+                            new_Models[key_1.Task_Name][key_2][key_3]=[
+                                Probing_Model_Attention(
+                                    len(self.Example_Input[self.ac_combi[0]][self.ac_combi[1]][key_3][1][keep][0]), 
+                                    np.size(Output[key_1.Task_Name][key_2]), 
+                                    self.Max_tokens, 
+                                    num_layers=self.probing_layers
+                                ).to(self.Example_Input[self.ac_combi[0]][self.ac_combi[1]][key_3][2]),
+                                Probing_Model_Attention(
+                                    len(self.Example_Input[self.ac_combi[0]][self.ac_combi[1]][key_3][1][keep][1]), 
+                                    np.size(Output[key_1.Task_Name][key_2]),
+                                    self.Max_tokens, 
+                                    num_layers=self.probing_layers
+                                ).to(self.Example_Input[self.ac_combi[0]][self.ac_combi[1]][key_3][2])
+                            ]
+                            new_Optimizers[key_1.Task_Name][key_2][key_3]= [
+                                optim.Adam(new_Models[key_1.Task_Name][key_2][key_3][0].parameters(), lr=self.learning_rate),
+                                optim.Adam(new_Models[key_1.Task_Name][key_2][key_3][1].parameters(), lr=self.learning_rate)
+                            ]
         Output=None
         return new_Models,new_Optimizers
 
@@ -324,12 +374,12 @@ class Probing(Prediction_Helpers.Prediction_Helper):
     
     def Train_Ac_Probing_Model(self,ac_model,optimizer,ac_input,ac_expected_output):
         if not self.Testing:
-            outputs = ac_model(torch.from_numpy(ac_input).float().to(self.probing_device)).unsqueeze(0)
+            outputs = ac_model(ac_input.squeeze(0)).unsqueeze(0) #float()
         else:
             with torch.no_grad():
-                outputs = ac_model(torch.from_numpy(ac_input).float().to(self.probing_device)).unsqueeze(0)
+                outputs = ac_model(ac_input).unsqueeze(0)
         #print(optimizer)
-        loss = self.criterion(outputs, torch.from_numpy(np.array(ac_expected_output).flatten()).to(self.probing_device).unsqueeze(0).float())
+        loss = self.criterion(outputs, torch.from_numpy(np.array(ac_expected_output).flatten()).to(outputs.device).unsqueeze(0).float())
         if not self.Testing:
             optimizer.zero_grad()
             loss.backward()
@@ -342,47 +392,54 @@ class Probing(Prediction_Helpers.Prediction_Helper):
         
         key_1 = self.ac_combi[0]
         key_2 = self.ac_combi[1]
-
-        if isinstance(Given_Input[key_1][key_2], np.ndarray): 
-            top_input,bottom_input=self.selective_keep(Given_Input[key_1][key_2], self.relevance_map[key_1][key_2], keep)            
-            for aux_key_1 in ac_task.Intermediate_Results_Names:
-                loss=self.Train_Ac_Probing_Model(
-                    ac_Models[ac_task.Task_Name][aux_key_1][0],
-                    ac_Optimizers[ac_task.Task_Name][aux_key_1][0],
-                    top_input,
-                    Expected_Output[aux_key_1]    
-                )
-                self.Add_Loss(self.Metadata[ac_task.Task_Name]["Loss"][aux_key_1][key_1][key_2][0],keep,loss)
+        
+        if self.Example_Input[key_1][key_2][0]=='T': 
+            #print("start")
+            inputs=None
+            if isinstance(self.Example_Input[self.ac_combi[0]][self.ac_combi[1]][1][keep],int):
+                #print(Given_Input[key_1][key_2].shape)
+                inputs=[Given_Input[key_1][key_2][0]]
+            else:
+                inputs=self.selective_keep(
+                    Given_Input[key_1][key_2][0], 
+                    self.Example_Input[self.ac_combi[0]][self.ac_combi[1]][1][keep]
+                ) 
                 
-                loss=self.Train_Ac_Probing_Model(
-                    ac_Models[ac_task.Task_Name][aux_key_1][1],
-                    ac_Optimizers[ac_task.Task_Name][aux_key_1][1],
-                    bottom_input,
-                    Expected_Output[aux_key_1]    
-                )
-                self.Add_Loss(self.Metadata[ac_task.Task_Name]["Loss"][aux_key_1][key_1][key_2][1],keep,loss)
+            for aux_key_1 in ac_task.Intermediate_Results_Names:
+                for ac_model in range(len(inputs)):
+                    loss=self.Train_Ac_Probing_Model(
+                        ac_Models[ac_task.Task_Name][aux_key_1][ac_model],
+                        ac_Optimizers[ac_task.Task_Name][aux_key_1][ac_model],
+                        inputs[ac_model],
+                        Expected_Output[aux_key_1]    
+                    )
+                    self.Add_Loss(self.Metadata[ac_task.Task_Name]["Loss"][aux_key_1][key_1][key_2][ac_model],keep,loss)
+            
+            #print("stop")
                     
             
         else:
             for key_3 in range(len(Given_Input[key_1][key_2])):
-                top_input,bottom_input=self.selective_keep(Given_Input[key_1][key_2][key_3], self.relevance_map[key_1][key_2][key_3], keep)                
-                for aux_key_1 in ac_task.Intermediate_Results_Names:
-                    loss=self.Train_Ac_Probing_Model(
-                        ac_Models[ac_task.Task_Name][aux_key_1][key_3][0],
-                        ac_Optimizers[ac_task.Task_Name][aux_key_1][key_3][0],
-                        top_input,
-                        Expected_Output[aux_key_1]    
-                    )
-                    self.Add_Loss(self.Metadata[ac_task.Task_Name]["Loss"][aux_key_1][key_1][key_2][key_3][0],keep,loss)
+                inputs=None
+                #print(self.Example_Input[self.ac_combi[0]][self.ac_combi[1]][key_3])
+                #print(self.ac_combi[0],self.ac_combi[1])
+                if isinstance(self.Example_Input[self.ac_combi[0]][self.ac_combi[1]][key_3][1][keep],int):
+                    inputs=[Given_Input[key_1][key_2][key_3][0]]
+                else:
+                    inputs=self.selective_keep(
+                        Given_Input[key_1][key_2][key_3][0], 
+                        self.Example_Input[self.ac_combi[0]][self.ac_combi[1]][key_3][1][keep]
+                    ) 
                     
-                    loss=self.Train_Ac_Probing_Model(
-                        ac_Models[ac_task.Task_Name][aux_key_1][key_3][1],
-                        ac_Optimizers[ac_task.Task_Name][aux_key_1][key_3][1],
-                        bottom_input,
-                        Expected_Output[aux_key_1]    
-                    )
-                    self.Add_Loss(self.Metadata[ac_task.Task_Name]["Loss"][aux_key_1][key_1][key_2][key_3][1],keep,loss)
-
+                for aux_key_1 in ac_task.Intermediate_Results_Names:
+                    for ac_model in range(len(inputs)):
+                        loss=self.Train_Ac_Probing_Model(
+                            ac_Models[ac_task.Task_Name][aux_key_1][key_3][ac_model],
+                            ac_Optimizers[ac_task.Task_Name][aux_key_1][key_3][ac_model],
+                            inputs[ac_model],
+                            Expected_Output[aux_key_1]    
+                        )
+                        self.Add_Loss(self.Metadata[ac_task.Task_Name]["Loss"][aux_key_1][key_1][key_2][key_3][ac_model],keep,loss)
 
     
     def Train_Probing_Models(
@@ -420,15 +477,29 @@ class Probing(Prediction_Helpers.Prediction_Helper):
         while self.Metadata["progress"]<len(layer_idx_combos):
             Tasks_done=[0,0]
             torch.cuda.empty_cache()
-            
-            self.ac_combi=layer_idx_combos[self.Metadata["progress"]]
-            processed_percentage=self.Metadata["progress"]/len(layer_idx_combos)
-            print('[INFO] Working on Layer:',self.ac_combi[0],'; Index:',self.ac_combi[1],";Tasks done:",str(Tasks_done),"Remaining:",self.TimeMeasurer.stop(processed_percentage),flush=True)
 
-            ac_Models,ac_Optimizers=self.init_Models()
+
+            #allow for model batch calculation
+            Settings_batches=[]
+            working_on_layers=[]
+            for _ in range(min(self.layers_per_run,len(layer_idx_combos)-self.Metadata["progress"])):
+                Settings_batches.append([])
+                Settings_batches[-1].append(layer_idx_combos[self.Metadata["progress"]])
+                working_on_layers.append(layer_idx_combos[self.Metadata["progress"]])
+                self.ac_combi=layer_idx_combos[self.Metadata["progress"]]
+                ac_Models,ac_Optimizers=self.init_Models()
+                Settings_batches[-1].append(ac_Models)
+                Settings_batches[-1].append(ac_Optimizers)
+                self.Metadata["progress"]+=1
+                
+            processed_percentage=(self.Metadata["progress"]-len(Settings_batches))/len(layer_idx_combos)      
+            
+            print('[INFO] Working on Layers:',str(working_on_layers),"; Remaining:",self.TimeMeasurer.stop(processed_percentage),flush=True)
+                
             self.Testing=False
             while Tasks_done[0]<self.Metadata["Number_of_samples"] or Tasks_done[1]<self.Metadata["Number_of_samples"]:
                 #print(Tasks_done)
+                #print("h1")
                 actual_task=None
                 if Tasks_done[0]<self.Metadata["Number_of_samples"]:
                     actual_task=self.task_1
@@ -446,14 +517,22 @@ class Probing(Prediction_Helpers.Prediction_Helper):
                 actual_task.New_Task()
                 Task_Text,Task_Result,Intermediate_Variables=actual_task.Generate_Task()
                 
+                #print("h2")
                 Hidden_Features,_=self.Get_Results(Task_Text,Task_Result)
                 
-                self.Train_Probing_Models(
-                    Hidden_Features,
-                    Intermediate_Variables,
-                    actual_task,
-                    ac_Models,
-                    ac_Optimizers)
+                #print("h3")
+                
+                for ac_batch_elem in Settings_batches:
+                    self.ac_combi=ac_batch_elem[0]
+                    ac_Models=ac_batch_elem[1]
+                    ac_Optimizers=ac_batch_elem[2]
+                    self.Train_Probing_Models(
+                        Hidden_Features,
+                        Intermediate_Variables,
+                        actual_task,
+                        ac_Models,
+                        ac_Optimizers)
+                #print("h4")
 
             
             self.Testing=True
@@ -463,22 +542,33 @@ class Probing(Prediction_Helpers.Prediction_Helper):
                     actual_task_key=actual_task.Task_Name
                     Task_Text,Task_Result,Intermediate_Variables=actual_task.get_Train_Sample(test_idx)
                     Hidden_Features,_=self.Get_Results(Task_Text,Task_Result)
-                    self.Train_Probing_Models(
-                        Hidden_Features,
-                        Intermediate_Variables,
-                        actual_task,
-                        ac_Models,
-                        ac_Optimizers
-                    )
+                    for ac_batch_elem in Settings_batches:
+                        self.ac_combi=ac_batch_elem[0]
+                        ac_Models=ac_batch_elem[1]
+                        ac_Optimizers=ac_batch_elem[2]
+                        self.Train_Probing_Models(
+                            Hidden_Features,
+                            Intermediate_Variables,
+                            actual_task,
+                            ac_Models,
+                            ac_Optimizers
+                        )
                 Tasks_done[0]+=1
                 Tasks_done[1]+=1
-            self.Metadata["progress"]+=1
             self.Save_Metadata()
-        return self.Metadata[self.task_1.Task_Name]["Loss"],self.Metadata[self.task_2.Task_Name]["Loss"]
+            del ac_batch_elem
+            del ac_Models
+            del ac_Optimizers
+            gc.collect()
+            torch.cuda.empty_cache()
+            gc.collect()
 
     def Get_Probing_Results(self,Number_of_samples):
         if self.Probing_Map_Method=="Probing":
             self.Get_Probing(Number_of_samples)
-        ray.shutdown()
+        del self.model_handler
+        gc.collect()
+        torch.cuda.empty_cache()
+        gc.collect()
         
         

@@ -9,12 +9,10 @@ from collections import OrderedDict
 import gc
 
 #Hyperparameters:
-Relevance_Steps=100
-Probing_Steps=2000
-Testing_Samples=100
-Intervention_Steps=100
-num_gpus=3
-num_cpus=7
+Relevance_Steps=2#100
+Probing_Steps=2#2000
+Testing_Samples=2#100
+Intervention_Steps=2#100
 #torch.set_num_threads(6)
 
 max_examples_token_length=300
@@ -22,7 +20,7 @@ Use_Context=True
 Relevance_Map_Method="vanilla_gradient" 
 Probing_Method='Probing'
 
-#"""
+"""
 model_id = "meta-llama/Llama-3.2-1B" 
 max_memory=OrderedDict([
     ('model.embed_tokens', 0), 
@@ -46,43 +44,43 @@ max_memory=OrderedDict([
     ('model.rotary_emb', 0), 
     ('lm_head', 0), 
     ('model.layers.13.mlp', 0)])
-#"""
+"""
 
-"""
-model_id="meta-llama/Llama-3.2-3B"
-device_map=OrderedDict([('model.embed_tokens', 7), 
-                        ('model.layers.0', 7), 
-                        ('model.layers.1', 7), 
-                        ('model.layers.2', 7), 
-                        ('model.layers.3', 7), 
-                        ('model.layers.4', 7), 
-                        ('model.layers.5', 7), 
-                        ('model.layers.6', 7), 
-                        ('model.layers.7', 7), 
-                        ('model.layers.8', 7), 
-                        ('model.layers.9', 7), 
-                        ('model.layers.10', 6), 
-                        ('model.layers.11', 6), 
-                        ('model.layers.12', 6), 
-                        ('model.layers.13', 6), 
-                        ('model.layers.14', 6), 
-                        ('model.layers.15', 6), 
-                        ('model.layers.16', 6), 
-                        ('model.layers.17', 6), 
-                        ('model.layers.18', 6), 
-                        ('model.layers.19', 6), 
-                        ('model.layers.20', 6), 
-                        ('model.layers.21', 6), 
-                        ('model.layers.22', 6), 
-                        ('model.layers.23', 6), 
-                        ('model.layers.24', 6), 
-                        ('model.layers.25', 6), 
-                        ('model.layers.26', 6), 
-                        ('model.layers.27', 6), 
-                        ('model.norm', 7), 
-                        ('model.rotary_emb', 7), 
-                        ('lm_head', 7)])
-"""
+#"""
+model_id="Local-Meta-Llama-3.2-3B"
+max_memory=OrderedDict([('model.embed_tokens', 0), 
+                        ('model.layers.0', 1), 
+                        ('model.layers.1', 1), 
+                        ('model.layers.2', 1), 
+                        ('model.layers.3', 1), 
+                        ('model.layers.4', 1), 
+                        ('model.layers.5', 1), 
+                        ('model.layers.6', 1), 
+                        ('model.layers.7', 1), 
+                        ('model.layers.8', 1), 
+                        ('model.layers.9', 1), 
+                        ('model.layers.10', 2), 
+                        ('model.layers.11', 2), 
+                        ('model.layers.12', 2), 
+                        ('model.layers.13', 2), 
+                        ('model.layers.14', 2), 
+                        ('model.layers.15', 2), 
+                        ('model.layers.16', 2), 
+                        ('model.layers.17', 2), 
+                        ('model.layers.18', 2), 
+                        ('model.layers.19', 2), 
+                        ('model.layers.20', 3), 
+                        ('model.layers.21', 3), 
+                        ('model.layers.22', 3), 
+                        ('model.layers.23', 3), 
+                        ('model.layers.24', 3), 
+                        ('model.layers.25', 3), 
+                        ('model.layers.26', 3), 
+                        ('model.layers.27', 3), 
+                        ('model.norm', 0), 
+                        ('model.rotary_emb', 0), 
+                        ('lm_head', 0)])
+#"""
 
 
 tokenizer = AutoTokenizer.from_pretrained(model_id)
@@ -151,10 +149,7 @@ RelMap=Relevance_Maps.Relevance_Map(
     Task_1,
     Task_2,
     tokenizer,
-    Allowed_Model_Usage_Before_Refresh=100,
-    max_memory=max_memory,
-    num_gpus=num_gpus,
-    num_cpus=num_cpus
+    max_memory=max_memory
 )
 Rel_Map_Result=RelMap.Get_Relevance_Map(Number_of_samples=Relevance_Steps)
 print("[INFO] Step 2: Finished")
@@ -172,10 +167,7 @@ MyProbing=Probing.Probing(
     Rel_Map_Result,
     Testing_Samples,
     probing_layers=1,
-    Allowed_Model_Usage_Before_Refresh=2000,
-    max_memory=max_memory,
-    num_gpus=num_gpus,
-    num_cpus=num_cpus
+    max_memory=max_memory
 )
 MyProbing.Get_Probing_Results(Number_of_samples=Probing_Steps)
 print("[INFO] Step 3: Finished")
@@ -225,10 +217,7 @@ for actasks in tasksettings:
             actasks[1],
             tokenizer,
             Rel_Map_Result,
-            Allowed_Model_Usage_Before_Refresh=100,
             max_memory=max_memory,
-            num_gpus=num_gpus,
-            num_cpus=num_cpus
         )
         Inti.Get_Intervention_Results(Number_of_samples=Intervention_Steps)
 print("[INFO] Step 5: Intervention")

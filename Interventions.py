@@ -3,10 +3,10 @@ import Intervention_Model
 import torch.functional as F
 import torch.nn as nn
 import torch
-import ray
 import numpy as np
 import json
 import os
+import gc
 from TimeMeasurer import TimeMeasurer
 
 class Intervention(Prediction_Helpers.Prediction_Helper):
@@ -49,19 +49,12 @@ class Intervention(Prediction_Helpers.Prediction_Helper):
         self.TimeMeasurer=TimeMeasurer()
     
     def Get_Results(self,Task_base_Text,Task_base_Result,Task_Inter_Text,Task_Inter_Result):
-        if self.Allowed_Model_Usage_Before_Refresh<=self.Actual_Model_Usage:
-            if self.verbose:
-                print("[RAY ] Killed Container")
-            ray.kill(self.model_handler)
-            self.model_handler=None
-            self.Actual_Model_Usage=0
         if self.model_handler is None:
             if self.verbose:
-                print("[RAY ] Generated Container")
-            self.model_handler=Intervention_Model.create_llm_remote(self.model_id, self.max_memory , self.tokenizer, self.relevance_map, self.Change_arr, num_gpus=self.num_gpus,num_cpus=self.num_cpus)
-        self.Actual_Model_Usage+=1
+                print("[INFO] LLM generated")
+            self.model_handler=Intervention_Model.create_llm_remote(self.model_id, self.max_memory , self.tokenizer, self.relevance_map, self.Change_arr)
 
-        results=ray.get(self.model_handler.get_results.remote(Task_base_Text,Task_base_Result,Task_Inter_Text,Task_Inter_Result))
+        results=self.model_handler.get_results(Task_base_Text,Task_base_Result,Task_Inter_Text,Task_Inter_Result)
 
         return results
     
@@ -124,6 +117,10 @@ class Intervention(Prediction_Helpers.Prediction_Helper):
                 self.results=self.add_nested_dicts(self.results,ac_result)
             self.Computed_Samples+=1
             self.Save_Interim_Results()
+            
+        del self.model_handler
+        gc.collect()
+        torch.cuda.empty_cache()
+        gc.collect()
         return self.results
-        ray.shutdown()
         
