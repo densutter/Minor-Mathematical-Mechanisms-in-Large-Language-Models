@@ -1,5 +1,13 @@
 Note: Part of this code is copied from other code as well as using ChatGPT. I noted when I took some code from somewhere else directly in the code. However I do not specifically mark the sections made with the help from ChatGPT. To avoid any copyright issues, assume that the whole code was made with the help from ChatGPT.
 
+
+To get the the results from my experiment pipeline in my report run: 
+
+main.py file
+
+
+A description about the different files:
+
 main.py: main programm to run experiments
 
 LLM_Tasks.py: includes the code for generate the tasks for the LLMs
