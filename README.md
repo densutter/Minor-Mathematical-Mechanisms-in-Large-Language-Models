@@ -29,7 +29,3 @@ python main.py
 - **`captum_helper.py`** – Overwrites Captum’s original code (fixing functionality issues).  
 - **`Prediction_Helpers.py`** – Helper functions for `Relevance_Maps.py` and `Probing.py`.  
 - **`TimeMeasurer.py`** – Provides time predictions for experiments.  
-
----
-
-This version is cleaner and easier to navigate. Let me know if you want further refinements! 🚀
