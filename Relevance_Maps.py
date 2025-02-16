@@ -70,8 +70,8 @@ class Relevance_Map(Prediction_Helpers.Prediction_Helper):
         self.TimeMeasurer=TimeMeasurer()
 
 
-        """
-        if self.Actually_Supported_Relevance_Map_Methods in self.Baseline_Methods:
+        # Used to create baselines in case it is needed
+        if Relevance_Map_Method in self.Baseline_Methods:
             
             num_samples=math.ceil(num_baselines/2)
 
@@ -86,7 +86,6 @@ class Relevance_Map(Prediction_Helpers.Prediction_Helper):
                 for ac_sample_point in len(ac_task.Test_Samples):
                     test_sample=ac_task.get_Train_Sample(ac_sample_point)
                     self.Baselines.append(test_sample[0])
-        """
 
 
     def Check_Interim_Results_Folder(self):
@@ -112,7 +111,6 @@ class Relevance_Map(Prediction_Helpers.Prediction_Helper):
             self.Metadata[self.task_1.Task_Name]["Abs_dist"]=0
 
         ac_url=self.interim_results_path+self.task_2.Task_Name
-        #print(self.task_2.Task_Name)
         if all_files is not None and 'Metadata.json' in all_files:
             with open(ac_url+'/Metadata.json', 'r') as file:
                 self.Metadata[self.task_2.Task_Name] = json.load(file)
@@ -165,7 +163,6 @@ class Relevance_Map(Prediction_Helpers.Prediction_Helper):
                     # Check if the value is a single numpy array
                     if isinstance(B, np.ndarray):
                         result_dict[key1][key2] = mult_fact * B
-                        #print(B.shape)
 
                     # Otherwise, assume it's a list of numpy arrays
                     else:
@@ -175,7 +172,6 @@ class Relevance_Map(Prediction_Helpers.Prediction_Helper):
 
         # Proceed with the original computation if Average_Dict is not None
         result_dict = {}
-        #print("yeiii")
         for key1 in Average_Dict:
             result_dict[key1] = {}
             for key2 in Average_Dict[key1]:
@@ -274,7 +270,6 @@ class Relevance_Map(Prediction_Helpers.Prediction_Helper):
         return result_dict
 
     def Preprocess_Gradient(self,acGrad):
-        #print(acGrad.device)
         acGrad=acGrad.cpu().numpy()
         acGrad=np.abs(acGrad)
         acGrad=np.mean(acGrad, axis=0)
@@ -311,28 +306,24 @@ class Relevance_Map(Prediction_Helpers.Prediction_Helper):
         return result_dict
 
     def Compute_Relevance_Map_Relation(self,mean_task1,mean_task2,var_task1,var_task2):
-        mean_task1 = np.array(mean_task1)
-        mean_task2 = np.array(mean_task2)
-        var_task1  = np.array(var_task1)
-        var_task2  = np.array(var_task2)
+        
 
-        normalizing = (var_task1+var_task2)/2
-        dev_from_0_task1 = mean_task1/normalizing
-        dev_from_0_task2 = mean_task2/normalizing
-
+        if len(mean_task1.shape)!=1:
+            print("Error: relvance maps have wrong shape")
+            exit()
+        dev_from_0_task1=np.argsort(np.argsort(mean_task1))
+        dev_from_0_task2=np.argsort(np.argsort(mean_task2))
         diff_tasks = dev_from_0_task1-dev_from_0_task2
 
         return diff_tasks
 
+
     def Compute_Relevance_Map(self, ac_mean, ac_var):
 
         ret_val={}
-        #print(ac_mean)
         for key_1 in ac_mean[self.task_1.Task_Name]:
             ret_val[key_1]={}
             for key_2 in ac_mean[self.task_1.Task_Name][key_1]:
-                #print(type(ac_mean[self.task_1.Task_Name][key_1][key_2]))
-                #exit()
                 if isinstance(ac_mean[self.task_1.Task_Name][key_1][key_2], torch.Tensor) or isinstance(ac_mean[self.task_1.Task_Name][key_1][key_2], np.ndarray):
                     ret_val[key_1][key_2]=self.Compute_Relevance_Map_Relation(
                         ac_mean[self.task_1.Task_Name][key_1][key_2],
@@ -390,19 +381,15 @@ class Relevance_Map(Prediction_Helpers.Prediction_Helper):
             self.Metadata[actual_task_key]['Computed']=self.Metadata[actual_task_key]['Computed']+1
 
             Gradients,Correctly_classified=self.Get_Results(Task_Text,Task_Result)
-            #print(Gradients)
 
             self.Metadata[actual_task_key]['Accuracy']+=Correctly_classified[0]
             self.Metadata[actual_task_key]['Abs_dist']+=Correctly_classified[1]
-            #print("*"*100)
-            #print(Correctly_classified)
-            #print(Gradients)
 
             #Save Averaging of Gradients
             Gradients=self.Preprocess_Gradient_Dicts(Gradients)
             #For averaging
             Gradient_Means[actual_task.Task_Name]=self.update_dicts(Gradient_Means[actual_task.Task_Name],Gradients,1/Number_of_samples)
-            #For max:
+            #If you would like to use max instead:
             #Gradient_Means[actual_task.Task_Name]=self.max_dicts(Gradient_Means[actual_task.Task_Name],Gradients)
             self.Save_Gradient_Data(actual_task.Task_Name,"",Gradient_Means[actual_task.Task_Name])
 

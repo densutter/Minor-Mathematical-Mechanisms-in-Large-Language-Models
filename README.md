@@ -1,4 +1,4 @@
-Note: Part of this code is copied from other code as well as using ChatGPT. I plan to make it more clear from where the code comes to a later date. 
+Note: Part of this code is copied from other code as well as using ChatGPT. I noted when I took some code from somewhere else directly in the code. However I do not specifically mark the sections made with the help from ChatGPT. To avoid any copyright issues, assume that the whole code was made with the help from ChatGPT.
 
 main.py: main programm to run experiments
 

@@ -21,9 +21,9 @@ import seaborn as sns
 #tokenizer = AutoTokenizer.from_pretrained(model_id)
 #Use_Context=True
 
-Testing_Samples=100
+Testing_Samples=40*100
 Task_1=LLM_Tasks.Regression_Task_Int(None,Display_Context=False)
-Task_2=LLM_Tasks.Multiclass_Logistic_Regression_Task(None,Display_Context=False)
+Task_2=LLM_Tasks.Manhattan_Distance_Problem_Int(None,Display_Context=False)
 Task_1_Name=Task_1.Task_Name
 Task_2_Name=Task_2.Task_Name
 Interim_Results_URL='./interim_results/'
@@ -42,7 +42,53 @@ def ensure_folder_exists(folder_path):
     """
     if not os.path.exists(folder_path):
         os.makedirs(folder_path)
+        
+        
+def MakeSkylinePlot(y_vals,y_names,url,x_vals=None,mconst=round((22**2)/12,2)):
+    x_vals = list(range(len(y_vals[0])))  
+    
+    fig, ax = plt.subplots(figsize=(8, 5))
 
+    colors=["aqua","midnightblue"]
+    for ac_y_pos,ac_y in enumerate(y_vals):
+        ax.step(x_vals, ac_y, where='mid', color=colors[ac_y_pos], linewidth=2, label=y_names[ac_y_pos]) 
+    
+    ax.axhline(y=mconst, color='darkgreen', linestyle='dashed', linewidth=2, label="y = "+str(mconst))
+    
+    ax.set_xticks(x_vals)
+    ax.set_xticklabels(x_vals)
+    
+    ax.set_xlabel("Depth")  
+    ax.set_ylabel("Loss") 
+    
+    #ax.legend(loc="upper left", bbox_to_anchor=(1, 1))  # Moves legend outside
+    ax.legend(loc="upper left")  # Moves legend outside
+    
+    plt.savefig(url, bbox_inches="tight", dpi=300)  # High-quality save
+    
+def MakeSkylinePlot_V2(y_vals,y_names,y_label,url,x_vals=None):
+    x_vals = list(range(len(y_vals[0])))  
+    
+    fig, ax = plt.subplots(figsize=(8, 5))
+
+    colors=["aqua","midnightblue","orchid","darkorchid"]
+    for ac_y_pos,ac_y in enumerate(y_vals):
+        ax.step(x_vals, ac_y, where='mid', color=colors[ac_y_pos], linewidth=2, label=y_names[ac_y_pos]) 
+    
+    #ax.axhline(y=mconst, color='darkgreen', linestyle='dashed', linewidth=2, label="y = "+str(mconst))
+    
+    ax.set_xticks(x_vals)
+    ax.set_xticklabels(x_vals)
+    
+    ax.set_xlabel("Depth")  
+    ax.set_ylabel(y_label) 
+    
+    #ax.legend(loc="upper left", bbox_to_anchor=(1, 1))  # Moves legend outside
+    ax.legend(loc="upper left")  # Moves legend outside
+    
+    plt.savefig(url, bbox_inches="tight", dpi=300)  # High-quality save
+    plt.close()
+    
 def Make_Heatmap_Relevance_Map(HM_Values,Relevance_Heatmap_URL):
     ensure_folder_exists(Relevance_Heatmap_URL)
     for ac_Layer in HM_Values:
@@ -124,7 +170,7 @@ def analyze_data(input_data_structure, test_loss_num):
     return results
 
 
-def Make_Heatmap_Probing_Helper(probing_results,probing_results_url):
+def Make_Heatmap_Probing_Helper(probing_results,probing_results_url,task_name):
     for intermed_var in probing_results:
         for layer_name in probing_results[intermed_var]:
             for output_version_idx in probing_results[intermed_var][layer_name]:
@@ -199,6 +245,32 @@ def Make_Heatmap_Probing_Helper(probing_results,probing_results_url):
                     plt.legend(loc='upper left', bbox_to_anchor=(1.05, 1), borderaxespad=0.)
                     plt.savefig(probing_results_url+'/Mean_Linegraph_'+intermed_var+"-"+layer_name+'_'+str(output_version_idx)+'.png', bbox_inches='tight')
                     plt.close()
+                    task_shortcut=""
+                    if task_name=="Regression_Task_Int_2_Numbers":
+                        task_shortcut="LR"
+                    elif task_name=="Manhattan_Distance_Int_2_Numbers":
+                        task_shortcut="MD"
+                    else:
+                        raise ValueError("Unknown Task: "+task_name)
+                    y_labels=[]
+                    y_vals=[]
+                    y_labels.append(r"$r_{("+task_shortcut+r")}^{(prob)}$")
+                    y_vals.append(mean_plot_data[0])
+                    MakeSkylinePlot(y_vals,y_labels,probing_results_url+'/StepGraphFull_'+intermed_var+"-"+layer_name+'_'+str(output_version_idx)+'.png')
+                    y_labels=[]
+                    y_vals=[]
+                    y_labels.append(r"$r_{("+task_shortcut+r",t,50)}^{(prob)}$")
+                    y_vals.append(mean_plot_data[1])
+                    y_labels.append(r"$r_{("+task_shortcut+r",b,50)}^{(prob)}$")
+                    y_vals.append(mean_plot_data[2])
+                    MakeSkylinePlot(y_vals,y_labels,probing_results_url+'/StepGraph50_'+intermed_var+"-"+layer_name+'_'+str(output_version_idx)+'.png')
+                    y_labels=[]
+                    y_vals=[]
+                    y_labels.append(r"$r_{("+task_shortcut+r",t,25)}^{(prob)}$")
+                    y_vals.append(mean_plot_data[3])
+                    y_labels.append(r"$r_{("+task_shortcut+r",b,25)}^{(prob)}$")
+                    y_vals.append(mean_plot_data[4])
+                    MakeSkylinePlot(y_vals,y_labels,probing_results_url+'/StepGraph25_'+intermed_var+"-"+layer_name+'_'+str(output_version_idx)+'.png')
                 
                 fig = plt.gcf()  # Get the current figure
                 fig.set_size_inches(18, 8)  # Set the size in inches
@@ -262,7 +334,7 @@ def Make_Heatmap_Probing(probing_interim_results_url,probing_results_url,Task_1_
         with open(probing_results_url_h+"/Results.json", 'w') as file:
             json.dump(probing_results, file, indent=4)
         
-        Make_Heatmap_Probing_Helper(probing_results,probing_results_url_h)
+        Make_Heatmap_Probing_Helper(probing_results,probing_results_url_h,ac_Task_Name)
 
 
 print("[INFO] Step 1: Generate Heatmaps for Relevance Maps")
@@ -297,3 +369,80 @@ probing_results_url         = Results_URL+"Probing_Results/"
 Make_Heatmap_Probing(probing_interim_results_url,probing_results_url,Task_1_Name,Task_2_Name,Testing_Samples)
 
 print("[INFO] Step 2: Finished")
+
+
+
+print("[INFO] Step 3: Analyse Intervention")
+
+folder_path="./results/Intervention"
+if not os.path.exists(folder_path):
+    os.makedirs(folder_path)
+
+Tasks=["Manhattan","Regression"]
+result_set={}
+for acfolder in os.listdir("./interim_results"):
+    acfolder_split=acfolder.split("_")
+    if acfolder_split[0]=="Intervention":
+        task1=acfolder_split[2]
+        task2=acfolder_split[8]
+        which_set=acfolder_split[-1]
+        if which_set not in result_set:
+            result_set[which_set]={}
+        if task1 not in result_set[which_set]:
+            result_set[which_set][task1]={}
+        with open("./interim_results/"+acfolder+"/Metadata.json", "r") as file:
+            result_set[which_set][task1][task2] = json.load(file)
+
+for relSet in result_set:
+    for task1 in result_set[relSet]:
+        for task2 in result_set[relSet][task1]:
+            for layerType in result_set[relSet][task1][task2][1]:
+                Combination=None
+                Combination_task2=None
+                Values={}
+                if task1==task2:
+                    Combination={}
+                    if task2==Tasks[0]:
+                        Combination_task2=Tasks[1]
+                    else:
+                        Combination_task2=Tasks[0]
+                for layerNum in result_set[relSet][task1][task2][1][layerType]:
+                    for metric in result_set[relSet][task1][task2][1][layerType][layerNum]:
+                        if metric not in Values:
+                            Values[metric]={}
+                        for acval in result_set[relSet][task1][task2][1][layerType][layerNum][metric]:
+                            if acval not in  Values[metric]:
+                                Values[metric][acval]=[]
+                            Values[metric][acval].append(result_set[relSet][task1][task2][1][layerType][layerNum][metric][acval]) 
+                        if Combination is not None:
+                            if metric not in Combination:
+                                Combination[metric]={}
+                            for acval in result_set[relSet][task1][task2][1][layerType][layerNum][metric]:
+                                if acval not in  Combination[metric]:
+                                    Combination[metric][acval]=[]
+                                Combination[metric][acval].append(result_set[relSet][task1][Combination_task2][1][layerType][layerNum][metric][acval]) 
+                #print(Values) 
+                #print(Combination)
+                for metric in Values:
+                    aclabels=[]
+                    acvalues=[]
+                    aclabels_comb=[]
+                    acvalues_comb=[]
+                    for acval in Values[metric]:
+                        aclabels.append(acval)
+                        acvalues.append(Values[metric][acval])
+                        if Combination is not None:
+                            aclabels_comb.append(acval)
+                            acvalues_comb.append(Combination[metric][acval])
+                    url=folder_path+"/Intervention_Plot_"+metric+"_"+layerType+"_"+task1+"_"+task2+"_"+relSet+".png"
+                    MakeSkylinePlot_V2(acvalues,aclabels,metric,url)   
+                    if Combination is not None:
+                        url=folder_path+"/Intervention_Plot_"+metric+"_"+layerType+"_"+task1+"_Combi_"+relSet+".png"
+                        aclabels_comb=aclabels+aclabels_comb
+                        aclabels_comb[0]=task2+" "+aclabels_comb[0]
+                        aclabels_comb[1]=task2+" "+aclabels_comb[1]
+                        aclabels_comb[2]=Combination_task2+" "+aclabels_comb[2]
+                        aclabels_comb[3]=Combination_task2+" "+aclabels_comb[3]
+                        MakeSkylinePlot_V2(acvalues+acvalues_comb,aclabels_comb,metric,url)   
+
+print("[INFO] Step 3: Finished")

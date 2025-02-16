@@ -12,7 +12,7 @@ from captum_helper import LLMGradientAttribution_Features
 from collections import OrderedDict
 import numpy as np
 from tqdm import tqdm
-# Suppress specific warnings that contain certain text
+
 warnings.filterwarnings(
     "ignore",
     message=r"for.*: copying from a non-meta parameter",
@@ -36,8 +36,6 @@ class LLM_remote:
         self.captum_tokenizer = None
         self.extracted_outputs={}
         self.change_arr=change_arr
-        #self.task_1=task_1
-        #self.task_2=task_2
 
         # Step 1: Use infer_auto_device_map to get the device map for the model
         self.device_map = self.max_memory
@@ -52,9 +50,9 @@ class LLM_remote:
         self.layers_to_hook_name_list=[]
 
         self.layers_to_hook = {}
-        self.layers_to_hook["embed_tokens"]=[self.model.model.embed_tokens]
-        self.layers_to_hook_layer_list.append(self.model.model.embed_tokens)
-        self.layers_to_hook_name_list.append(["embed_tokens",0])
+        #self.layers_to_hook["embed_tokens"]=[self.model.model.embed_tokens]
+        #self.layers_to_hook_layer_list.append(self.model.model.embed_tokens)
+        #self.layers_to_hook_name_list.append(["embed_tokens",0])
 
         self.number_tokens=[]
         for ac_num in range(1001):
@@ -62,11 +60,11 @@ class LLM_remote:
 
         for i_p,i in enumerate(self.model.model.layers):
 
-            if "q_proj" not in self.layers_to_hook:
-                self.layers_to_hook["q_proj"]=[]
-            self.layers_to_hook["q_proj"].append(i.self_attn.q_proj)
-            self.layers_to_hook_layer_list.append(i.self_attn.q_proj)
-            self.layers_to_hook_name_list.append(["q_proj",i_p])
+            #if "q_proj" not in self.layers_to_hook:
+            #    self.layers_to_hook["q_proj"]=[]
+            #self.layers_to_hook["q_proj"].append(i.self_attn.q_proj)
+            #self.layers_to_hook_layer_list.append(i.self_attn.q_proj)
+            #self.layers_to_hook_name_list.append(["q_proj",i_p])
 
             if "k_proj" not in self.layers_to_hook:
                 self.layers_to_hook["k_proj"]=[]
@@ -81,22 +79,22 @@ class LLM_remote:
             self.layers_to_hook_name_list.append(["v_proj",i_p])
             
 
-            if "o_proj" not in self.layers_to_hook:
-                self.layers_to_hook["o_proj"]=[]
-            self.layers_to_hook["o_proj"].append(i.self_attn.o_proj)
-            self.layers_to_hook_layer_list.append(i.self_attn.o_proj)
-            self.layers_to_hook_name_list.append(["o_proj",i_p])
+            #if "o_proj" not in self.layers_to_hook:
+            #    self.layers_to_hook["o_proj"]=[]
+            #self.layers_to_hook["o_proj"].append(i.self_attn.o_proj)
+            #self.layers_to_hook_layer_list.append(i.self_attn.o_proj)
+            #self.layers_to_hook_name_list.append(["o_proj",i_p])
 
             #Is not used in this setting (no gradients found)
             #if "rotary_emb" not in layers_to_hook:
             #    layers_to_hook["rotary_emb"]=[]
             #layers_to_hook["rotary_emb"].append(i.self_attn.rotary_emb)
 
-            if "mlp" not in self.layers_to_hook:
-                self.layers_to_hook["mlp"]=[]
-            self.layers_to_hook["mlp"].append(i.mlp)
-            self.layers_to_hook_layer_list.append(i.mlp)
-            self.layers_to_hook_name_list.append(["mlp",i_p])
+            #if "mlp" not in self.layers_to_hook:
+            #    self.layers_to_hook["mlp"]=[]
+            #self.layers_to_hook["mlp"].append(i.mlp)
+            #self.layers_to_hook_layer_list.append(i.mlp)
+            #self.layers_to_hook_name_list.append(["mlp",i_p])
 
         #self.layers_to_hook["rotary_emb_end"]=[self.model.model.rotary_emb]
         #self.layers_to_hook_layer_list.append(self.model.model.rotary_emb)
@@ -121,8 +119,7 @@ class LLM_remote:
 
             # Forward pass
             Model_output=self.model(**Task_Text_Tokens)
-            #print("mout", self.model.generate(**Task_Text_Tokens, max_new_tokens=1))
-            #print("mout", self.tokenizer.decode(self.model.generate(**Task_Text_Tokens, max_new_tokens=1)[0]))
+
             # Prepare outputs
             logits=Model_output.logits[0][-1][self.number_tokens]
         return logits,Task_Result_Token
@@ -145,17 +142,13 @@ class LLM_remote:
         # Step 3: Identify the features that need to be changed (between the start and end percentiles)
         change_indices = sorted_indices[start_percentile:end_percentile]
         
-        #print(intervention_tensor.shape)
-        #print(input_tensor.shape)
-        #print(change_indices)
-        #print(len(change_indices))
-        
         # Step 4: Intervene by setting the values of the selected features to the corresponding values from the intervention tensor
         # Loop through each batch and each word in the sequence
+
         for acb in range(input_tensor.shape[0]):  # Iterate over the batch dimension
             for aw in range(input_tensor.shape[1]):  # Iterate over the word dimension
                 # Change the values in the selected features for each word and batch element
-                #print(intervention_tensor.shape)
+
                 input_tensor[acb, aw, change_indices] = intervention_tensor[acb, aw, change_indices]
     
         # Return the modified input tensor
@@ -169,9 +162,7 @@ class LLM_remote:
                     self.extracted_outputs[layer_name] = {}
                 self.extracted_outputs[layer_name][layer_index]=output
             elif self.Mode=="Interception":
-                #print("h1")
                 if layer_name==self.Interception_Layer[0] and layer_index==self.Interception_Layer[1]:
-                    #print("h2")
                     return self.selective_exchange(output)
         return hook_fn
 
@@ -179,8 +170,6 @@ class LLM_remote:
 
 
     def Prepare_Input(self,Task_Text,Task_Result):
-        #TODO
-        #print(Task_Result)
         Task_Result_Token=self.tokenizer(Task_Result, return_tensors="pt").input_ids[0][1].item()
         Task_Text_Tokens = self.tokenizer(Task_Text, return_tensors="pt")
         Task_Text_Tokens = {key: value.to(self.model_device) for key, value in Task_Text_Tokens.items()}
@@ -205,8 +194,6 @@ class LLM_remote:
         
         Gold_Result_Base_Task=int(self.tokenizer.decode(Result_Token_Base_Task))
         Gold_Result_Inter_Task=int(self.tokenizer.decode(Result_Token_Inter_Task))
-        #print(Gold_Result_Base_Task,Gold_Result_Inter_Task)
-        #print(Logits_Base_Task)
         max_Base_Task=torch.argmax(Logits_Base_Task).item()
         max_Inter_Task=torch.argmax(Logits_Inter_Task).item()
         max_Intervention=torch.argmax(Logits_Intervention).item()
@@ -214,9 +201,7 @@ class LLM_remote:
         Pred_Result_Base_Task=int(self.tokenizer.decode(self.number_tokens[max_Base_Task]))
         Pred_Result_Inter_Task=int(self.tokenizer.decode(self.number_tokens[max_Inter_Task]))
         Pred_Result_Intervention=int(self.tokenizer.decode(self.number_tokens[max_Intervention]))
-        #print(Pred_Result_Base_Task,Pred_Result_Inter_Task,Pred_Result_Intervention)
 
-        #print(Logits_Base_Task)
         Prob_Base_Task = F.softmax(Logits_Base_Task,dim=0)
         Prob_Inter_Task = F.softmax(Logits_Inter_Task,dim=0)
         Prob_Intervention = F.softmax(Logits_Intervention,dim=0)
@@ -224,7 +209,7 @@ class LLM_remote:
         result={}
         result["correctly_classified"]={}
         result["correctly_classified"]["base"]=0
-        #print(Gold_Result_Base_Task,Pred_Result_Base_Task)
+
         if Gold_Result_Base_Task==Pred_Result_Base_Task:
             result["correctly_classified"]["base"]=1
         result["correctly_classified"]["intervention"]=0
@@ -272,7 +257,6 @@ class LLM_remote:
         #Extract features and output
         self.Mode="Interception"
         result={}
-        #print("Interception")
         for ac_Layer in self.layers_to_hook_name_list:
             if ac_Layer[0] not in result:
                 result[ac_Layer[0]]={}

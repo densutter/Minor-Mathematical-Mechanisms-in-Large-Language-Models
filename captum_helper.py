@@ -76,20 +76,10 @@ class LLMGradientAttribution_Features(LLMGradientAttribution):
             )
             attr = cast(Tensor, attr)
     
-            # will have the attr for previous output tokens
-            # cut to shape(batch_size, inp_len, emb_dim)
             if cur_target_idx:
                 attr = attr[:, :-cur_target_idx]
     
-            # the author of IG uses sum
-            # https://github.com/ankurtaly/Integrated-Gradients/blob/master/BertModel/bert_model_utils.py#L350
-            #print(attr.shape)
-            #attr = attr.sum(-1)
             attr_list.append(attr)
-    
-        # assume inp batch only has one instance
-        # to shape(n_output_token, ...)
-        
     
         return attr_list
 

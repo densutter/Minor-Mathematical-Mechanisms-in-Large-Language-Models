@@ -21,19 +21,6 @@ warnings.filterwarnings(
     category=UserWarning
 )
 
-class ModelWrapper:
-    def __init__(self, model):
-        self.model = model
-        self.logits = None  # To store logits during forward pass
-
-    def __call__(self, input_ids, attention_mask=None):
-        self.forward(input_ids, attention_mask=None)
-
-    def forward(self, input_ids, attention_mask=None):
-        # Forward pass
-        outputs = self.model(input_ids=input_ids, attention_mask=attention_mask)
-        self.logits = outputs.logits  # Capture logits for later use
-        return outputs.logits
 
 class LLM_remote:
     def __init__(self,model_id,max_memory,tokenizer,Relevance_Map_Method,Baselines,SG_iterations=10):
@@ -46,8 +33,6 @@ class LLM_remote:
         self.SG_iterations=SG_iterations
         self.Relevance_Map_Method=Relevance_Map_Method
         self.Baselines=Baselines
-        #self.task_1=task_1
-        #self.task_2=task_2
 
         # Step 1: Device Map to get the device map for the model
         self.device_map = self.max_memory
@@ -92,18 +77,13 @@ class LLM_remote:
             self.layers_to_hook_layer_list.append(i.self_attn.v_proj)
             self.layers_to_hook_name_list.append(["v_proj",i_p])
             
-            #print((self.Relevance_Map_Method not in ["captum-IntegratedGradients"]) or i_p==10)
+
             if self.Relevance_Map_Method not in ["captum-IntegratedGradients"]:
                 if "o_proj" not in self.layers_to_hook:
                     self.layers_to_hook["o_proj"]=[]
                 self.layers_to_hook["o_proj"].append(i.self_attn.o_proj)
                 self.layers_to_hook_layer_list.append(i.self_attn.o_proj)
                 self.layers_to_hook_name_list.append(["o_proj",i_p])
-
-            #Is not used in this setting (no gradients found)
-            #if "rotary_emb" not in layers_to_hook:
-            #    layers_to_hook["rotary_emb"]=[]
-            #layers_to_hook["rotary_emb"].append(i.self_attn.rotary_emb)
 
             if "mlp" not in self.layers_to_hook:
                 self.layers_to_hook["mlp"]=[]
@@ -134,7 +114,6 @@ class LLM_remote:
                     self.hooks.append(hook)
 
         elif self.Relevance_Map_Method=="captum-GradientXActivation":
-            #self.model_wrapped=ModelWrapper(self.model)
             self.captum_tokenizer=copy.deepcopy(self.tokenizer)
             self.captum_tokenizer.pad_token = self.captum_tokenizer.eos_token
             fa = captum.attr.LayerGradientXActivation(self.model,self.layers_to_hook_layer_list)
@@ -175,7 +154,6 @@ class LLM_remote:
     def tensors_to_lists(self,data,Gradient_Ex=True): #Helper function which ensures the detachment of the gradient
         if isinstance(data, torch.Tensor):  # Check if it's a tensor
             if Gradient_Ex:
-                #print(data.grad)
                 return data.grad.detach()
             else:
                 return data.detach()
@@ -202,19 +180,6 @@ class LLM_remote:
             return tuple(self.helper_grad(item) for item in data)
         else:
             return data  # If it's not a tensor, return it as-is
-    """
-    def helper_hiden_rep(self,data): #Helper function which ensures that gradients are saved
-        if isinstance(data, torch.Tensor):  # Check if it's a tensor
-            return data.cpu().numpy()
-        elif isinstance(data, dict):  # If it's a dictionary, recursively check its values
-            return {key: self.helper_hiden_rep(value) for key, value in data.items()}
-        elif isinstance(data, list):  # If it's a list, recursively check each element
-            return [self.helper_hiden_rep(item) for item in data]
-        elif isinstance(data, tuple):  # If it's a tuple, recursively check each element
-            return tuple(self.helper_hiden_rep(item) for item in data)
-        else:
-            return data  # If it's not a tensor, return it as-is
-    """
 
     def create_hook_fn_hidden_features(self,layer_name,layer_index):
         def hook_fn(module, input, output):
@@ -355,26 +320,6 @@ class LLM_remote:
         Abs_distance=Abs_distance/Total_classified
         return combined_gradients,[Correctly_classified,Abs_distance]
 
-    """
-    def get_results_vanilla_gradient(self,Task_Text,Task_Result):
-        # Prepare Input
-        Task_Result_Token,Task_Text_Tokens=self.Prepare_Input(Task_Text,Task_Result)
-
-        # Forward and backward pass
-        Model_output=self.forward_pass(Task_Text_Tokens)
-        loss = Model_output.logits[0][-1][Task_Result_Token]
-        self.backward_pass(loss)
-
-        # Prepare outputs
-        if  self.is_correctly_classified(Task_Result_Token,Model_output.logits[0][-1]):
-            Correctly_classified=1
-        else:
-            Correctly_classified=0
-        Gradients=self.tensors_to_lists(self.extracted_outputs)
-
-        return Gradients,Correctly_classified
-    """
-
 
     def get_results_hidden_Representation(self,Task_Text,Task_Result):
         # Prepare Input
@@ -426,7 +371,6 @@ class LLM_remote:
 
     def get_results_captum_GradientXActivationt(self,Task_Text,Task_Result):
         # Prepare Input
-        #Task_Result_Token,Task_Text_Tokens=self.Prepare_Input(Task_Text,Task_Result)
         inp = captum.attr.TextTokenInput(
             Task_Text,
             self.captum_tokenizer
@@ -434,22 +378,6 @@ class LLM_remote:
 
         # Forward and backward pass
         attributions=self.forward_pass(inp,Result_Target=Task_Result,Use_Captum=True)
-        #print(attributions[-1])
-        #print(attributions[0])
-        #print("*"*100)
-        #print(len(attributions))
-        #print(len(attributions[0]))
-        #print(len(attributions[0][-1]))
-        #print(attributions[0][-1][0].shape)
-        #print(len(self.layers_to_hook_name_list))
-        #print(len(attributions[-1]))
-        #print(attributions[-1][0].shape())
-        #if Task_Result_Token==torch.argmax(self.model_wrapped.logits[0][-1]).item():
-        #    Correctly_classified=1
-        #else:
-        #    Correctly_classified=0
-        #print("end")
-        #exit()
 
         att_dict=self.create_nested_dict(attributions[0], self.layers_to_hook_name_list)
 
@@ -457,9 +385,6 @@ class LLM_remote:
 
     def get_results_captum(self,Task_Text,Task_Result):
         # Prepare Input
-        #Task_Result_Token,Task_Text_Tokens=self.Prepare_Input(Task_Text,Task_Result)
-        #print(Task_Text)
-        #print(self.captum_tokenizer)
         inp = captum.attr.TextTokenInput(
             Task_Text,
             self.captum_tokenizer

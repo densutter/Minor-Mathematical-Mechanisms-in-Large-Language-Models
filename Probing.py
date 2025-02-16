@@ -22,7 +22,6 @@ class Probing_Model_Attention(nn.Module):
         num_layers (int): Number of layers for the output MLP.
         """
         super(Probing_Model_Attention, self).__init__()
-
         self.input_dim=input_dim
         self.max_tokens=max_tokens
         # Learnable initial projection layer (output_dim -> projection_dim)
@@ -52,14 +51,11 @@ class Probing_Model_Attention(nn.Module):
         Returns:
         torch.Tensor: Output tensor of shape (projection_dim).
         """
-        #print(values)
-        #print(values.shape)
         tokens, in_dim = values.shape
         assert in_dim == self.input_dim, \
             f"Expected values to have shape (tokens, {self.input_dim}), but got {values.shape}"
         assert tokens <= self.max_tokens, \
             f"Number of tokens ({tokens}) exceeds max_tokens ({self.max_tokens})"
-        #print(self.attention_vector)
         # Project each token from output_dim to projection_dim
         values = self.initial_projection(values)  # Shape: (tokens, projection_dim)
 
@@ -98,7 +94,8 @@ class Probing(Prediction_Helpers.Prediction_Helper):
         num_cpus=1,
         Max_tokens=400,
         learning_rate=0.001,
-        layers_per_run=40
+        layers_per_run=40,
+        num_testing_iterations=10
         ):
 
         self.model_id=model_id
@@ -141,11 +138,9 @@ class Probing(Prediction_Helpers.Prediction_Helper):
 
         self.Example_Input,_=self.Get_Results("test","0")
         self.Example_Input = self.tensor_to_list(self.Example_Input,self.relevance_map)
-        #print(self.Example_Input )
-        #exit()
         self.TimeMeasurer=TimeMeasurer()
         self.layers_per_run=layers_per_run
-
+        self.num_testing_iterations=num_testing_iterations
 
 
     def prepare_selective_mask(self, Masking_Arr):
@@ -163,7 +158,6 @@ class Probing(Prediction_Helpers.Prediction_Helper):
         
             # Get the indices of dimensions with highest and lowest values in Masking_Arr
             sorted_indices = np.argsort(Masking_Arr)  # Sort Masking_Arr to find the min and max indices
-            #print(sorted_indices)
             top_indices = sorted_indices[-keep_count:]  # Top 'keep_count' indices (highest Masking_Arr values)
             bottom_indices = sorted_indices[:keep_count]  # Bottom 'keep_count' indices (lowest Masking_Arr values)
             res_dict[keep]=[top_indices,bottom_indices]
@@ -231,8 +225,6 @@ class Probing(Prediction_Helpers.Prediction_Helper):
 
     def selective_keep(self, Input_Arr,masking):
         # Select the top and bottom values from Input_Arr for each token
-        #print(Input_Arr)
-        #print(masking)
         top_values = Input_Arr[:, masking[0]]
         bottom_values = Input_Arr[:, masking[1]]
         return top_values, bottom_values
@@ -258,7 +250,6 @@ class Probing(Prediction_Helpers.Prediction_Helper):
         Task_Text,Task_Result,Intermediate_Variables=self.task_2.Generate_Task()
         Output[self.task_2.Task_Name]=Intermediate_Variables
 
-        #print(Output.keys())
         new_Models={}
         new_Optimizers={}
         
@@ -378,7 +369,6 @@ class Probing(Prediction_Helpers.Prediction_Helper):
         else:
             with torch.no_grad():
                 outputs = ac_model(ac_input).unsqueeze(0)
-        #print(optimizer)
         loss = self.criterion(outputs, torch.from_numpy(np.array(ac_expected_output).flatten()).to(outputs.device).unsqueeze(0).float())
         if not self.Testing:
             optimizer.zero_grad()
@@ -392,12 +382,10 @@ class Probing(Prediction_Helpers.Prediction_Helper):
         
         key_1 = self.ac_combi[0]
         key_2 = self.ac_combi[1]
-        
+
         if self.Example_Input[key_1][key_2][0]=='T': 
-            #print("start")
             inputs=None
             if isinstance(self.Example_Input[self.ac_combi[0]][self.ac_combi[1]][1][keep],int):
-                #print(Given_Input[key_1][key_2].shape)
                 inputs=[Given_Input[key_1][key_2][0]]
             else:
                 inputs=self.selective_keep(
@@ -414,15 +402,11 @@ class Probing(Prediction_Helpers.Prediction_Helper):
                         Expected_Output[aux_key_1]    
                     )
                     self.Add_Loss(self.Metadata[ac_task.Task_Name]["Loss"][aux_key_1][key_1][key_2][ac_model],keep,loss)
-            
-            #print("stop")
-                    
+
             
         else:
             for key_3 in range(len(Given_Input[key_1][key_2])):
                 inputs=None
-                #print(self.Example_Input[self.ac_combi[0]][self.ac_combi[1]][key_3])
-                #print(self.ac_combi[0],self.ac_combi[1])
                 if isinstance(self.Example_Input[self.ac_combi[0]][self.ac_combi[1]][key_3][1][keep],int):
                     inputs=[Given_Input[key_1][key_2][key_3][0]]
                 else:
@@ -474,22 +458,29 @@ class Probing(Prediction_Helpers.Prediction_Helper):
             for ac_idx  in self.relevance_map[ac_layer]:
                 layer_idx_combos.append([ac_layer,ac_idx])
         self.TimeMeasurer.start()
+
+        
         while self.Metadata["progress"]<len(layer_idx_combos):
-            Tasks_done=[0,0]
+            
             torch.cuda.empty_cache()
+            Tasks_done=[0,0]
 
-
-            #allow for model batch calculation
+            #allow for model batches 
             Settings_batches=[]
             working_on_layers=[]
+            
             for _ in range(min(self.layers_per_run,len(layer_idx_combos)-self.Metadata["progress"])):
-                Settings_batches.append([])
-                Settings_batches[-1].append(layer_idx_combos[self.Metadata["progress"]])
+
                 working_on_layers.append(layer_idx_combos[self.Metadata["progress"]])
+                
                 self.ac_combi=layer_idx_combos[self.Metadata["progress"]]
                 ac_Models,ac_Optimizers=self.init_Models()
+                
+                Settings_batches.append([])
+                Settings_batches[-1].append(layer_idx_combos[self.Metadata["progress"]])
                 Settings_batches[-1].append(ac_Models)
                 Settings_batches[-1].append(ac_Optimizers)
+                
                 self.Metadata["progress"]+=1
                 
             processed_percentage=(self.Metadata["progress"]-len(Settings_batches))/len(layer_idx_combos)      
@@ -498,29 +489,23 @@ class Probing(Prediction_Helpers.Prediction_Helper):
                 
             self.Testing=False
             while Tasks_done[0]<self.Metadata["Number_of_samples"] or Tasks_done[1]<self.Metadata["Number_of_samples"]:
-                #print(Tasks_done)
-                #print("h1")
+                
                 actual_task=None
                 if Tasks_done[0]<self.Metadata["Number_of_samples"]:
                     actual_task=self.task_1
-                    actual_task_key=self.task_1.Task_Name
                     computed=Tasks_done[0]
                     Tasks_done[0]+=1
                 else: 
                     actual_task=self.task_2
-                    actual_task_key=self.task_2.Task_Name
                     computed=Tasks_done[1]
                     Tasks_done[1]+=1
                 
                 #Ensure that all tasks get the same samples at the same step
-                actual_task.Set_Random_Seed(self.Random_Offset+Tasks_done[0])
+                actual_task.Set_Random_Seed(self.Random_Offset+computed)
                 actual_task.New_Task()
                 Task_Text,Task_Result,Intermediate_Variables=actual_task.Generate_Task()
                 
-                #print("h2")
                 Hidden_Features,_=self.Get_Results(Task_Text,Task_Result)
-                
-                #print("h3")
                 
                 for ac_batch_elem in Settings_batches:
                     self.ac_combi=ac_batch_elem[0]
@@ -532,30 +517,28 @@ class Probing(Prediction_Helpers.Prediction_Helper):
                         actual_task,
                         ac_Models,
                         ac_Optimizers)
-                #print("h4")
 
-            
             self.Testing=True
-            for test_idx in range(self.testing_Samples):
-                for actual_task in [self.task_1,self.task_2]:
-
-                    actual_task_key=actual_task.Task_Name
-                    Task_Text,Task_Result,Intermediate_Variables=actual_task.get_Train_Sample(test_idx)
-                    Hidden_Features,_=self.Get_Results(Task_Text,Task_Result)
-                    for ac_batch_elem in Settings_batches:
-                        self.ac_combi=ac_batch_elem[0]
-                        ac_Models=ac_batch_elem[1]
-                        ac_Optimizers=ac_batch_elem[2]
-                        self.Train_Probing_Models(
-                            Hidden_Features,
-                            Intermediate_Variables,
-                            actual_task,
-                            ac_Models,
-                            ac_Optimizers
-                        )
-                Tasks_done[0]+=1
-                Tasks_done[1]+=1
-            self.Save_Metadata()
+            for ac_iteration in range(self.num_testing_iterations):
+                for test_idx in range(self.testing_Samples):
+                    for actual_task in [self.task_1,self.task_2]:
+                        Task_Text,Task_Result,Intermediate_Variables=actual_task.get_Train_Sample(test_idx,ac_iteration)
+                        Hidden_Features,_=self.Get_Results(Task_Text,Task_Result)
+                        for ac_batch_elem in Settings_batches:
+                            self.ac_combi=ac_batch_elem[0]
+                            ac_Models=ac_batch_elem[1]
+                            ac_Optimizers=ac_batch_elem[2]
+                            self.Train_Probing_Models(
+                                Hidden_Features,
+                                Intermediate_Variables,
+                                actual_task,
+                                ac_Models,
+                                ac_Optimizers
+                            )
+                    Tasks_done[0]+=1
+                    Tasks_done[1]+=1
+                self.Save_Metadata()
+                
             del ac_batch_elem
             del ac_Models
             del ac_Optimizers
@@ -570,5 +553,3 @@ class Probing(Prediction_Helpers.Prediction_Helper):
         gc.collect()
         torch.cuda.empty_cache()
         gc.collect()
-        
-        

@@ -9,13 +9,15 @@ from collections import OrderedDict
 import gc
 
 #Hyperparameters:
-Relevance_Steps=2#100
-Probing_Steps=2#2000
-Testing_Samples=2#100
-Intervention_Steps=2#100
-#torch.set_num_threads(6)
+Relevance_Steps=1000 
+Probing_Steps=20000 
+Testing_Samples=40 
+Num_testing_iterations=100 
+Layers_per_run=10000
+Intervention_Steps=500 
+Probing_learning_rate=0.0001
 
-max_examples_token_length=300
+Max_examples_token_length=600
 Use_Context=True
 Relevance_Map_Method="vanilla_gradient" 
 Probing_Method='Probing'
@@ -46,8 +48,45 @@ max_memory=OrderedDict([
     ('model.layers.13.mlp', 0)])
 """
 
-#"""
-model_id="Local-Meta-Llama-3.2-3B"
+
+model_id="meta-llama/Llama-3.2-3B"
+
+max_memory=OrderedDict([('model.embed_tokens', 7), 
+                        ('model.layers.0', 6), 
+                        ('model.layers.1', 6), 
+                        ('model.layers.2', 6), 
+                        ('model.layers.3', 6), 
+                        ('model.layers.4', 6), 
+                        ('model.layers.5', 6), 
+                        ('model.layers.6', 6), 
+                        ('model.layers.7', 6), 
+                        ('model.layers.8', 6), 
+                        ('model.layers.9', 6), 
+                        ('model.layers.10', 6), 
+                        ('model.layers.11', 6), 
+                        ('model.layers.12', 6), 
+                        ('model.layers.13', 6), 
+                        ('model.layers.14', 5), 
+                        ('model.layers.15', 5), 
+                        ('model.layers.16', 5), 
+                        ('model.layers.17', 5), 
+                        ('model.layers.18', 5), 
+                        ('model.layers.19', 5), 
+                        ('model.layers.20', 5), 
+                        ('model.layers.21', 5), 
+                        ('model.layers.22', 5), 
+                        ('model.layers.23', 5), 
+                        ('model.layers.24', 5), 
+                        ('model.layers.25', 5), 
+                        ('model.layers.26', 5), 
+                        ('model.layers.27', 5), 
+                        ('model.norm', 7), 
+                        ('model.rotary_emb', 7), 
+                        ('lm_head', 7)])
+"""
+
+
+model_id="meta-llama/Llama-3.1-8B"
 max_memory=OrderedDict([('model.embed_tokens', 0), 
                         ('model.layers.0', 1), 
                         ('model.layers.1', 1), 
@@ -55,88 +94,67 @@ max_memory=OrderedDict([('model.embed_tokens', 0),
                         ('model.layers.3', 1), 
                         ('model.layers.4', 1), 
                         ('model.layers.5', 1), 
-                        ('model.layers.6', 1), 
-                        ('model.layers.7', 1), 
-                        ('model.layers.8', 1), 
-                        ('model.layers.9', 1), 
+                        ('model.layers.6', 2), 
+                        ('model.layers.7', 2), 
+                        ('model.layers.8', 2), 
+                        ('model.layers.9', 2), 
                         ('model.layers.10', 2), 
-                        ('model.layers.11', 2), 
-                        ('model.layers.12', 2), 
-                        ('model.layers.13', 2), 
-                        ('model.layers.14', 2), 
-                        ('model.layers.15', 2), 
-                        ('model.layers.16', 2), 
-                        ('model.layers.17', 2), 
-                        ('model.layers.18', 2), 
-                        ('model.layers.19', 2), 
-                        ('model.layers.20', 3), 
-                        ('model.layers.21', 3), 
-                        ('model.layers.22', 3), 
-                        ('model.layers.23', 3), 
-                        ('model.layers.24', 3), 
-                        ('model.layers.25', 3), 
-                        ('model.layers.26', 3), 
-                        ('model.layers.27', 3), 
+                        ('model.layers.11', 3), 
+                        ('model.layers.12', 3), 
+                        ('model.layers.13', 3), 
+                        ('model.layers.14', 3), 
+                        ('model.layers.15', 4), 
+                        ('model.layers.16', 4), 
+                        ('model.layers.17', 4), 
+                        ('model.layers.18', 4), 
+                        ('model.layers.19', 5), 
+                        ('model.layers.20', 5), 
+                        ('model.layers.21', 5), 
+                        ('model.layers.22', 5), 
+                        ('model.layers.23', 6), 
+                        ('model.layers.24', 6), 
+                        ('model.layers.25', 6), 
+                        ('model.layers.26', 6), 
+                        ('model.layers.27', 6), 
+                        ('model.layers.28', 7), 
+                        ('model.layers.29', 7), 
+                        ('model.layers.30', 7), 
+                        ('model.layers.31', 7), 
                         ('model.norm', 0), 
                         ('model.rotary_emb', 0), 
                         ('lm_head', 0)])
-#"""
-
+"""
 
 tokenizer = AutoTokenizer.from_pretrained(model_id)
-
-
 
 
 #Step 1: Select Tasks
 print("[INFO] Step 1: Prepare Tasks")
 
-"""
-original_list = list(range(23))
 
-# Shuffle the list randomly
-np.random.shuffle(original_list)
-
-# If the length is odd, ignore the last element
-if len(original_list) % 2 != 0:
-    original_list = original_list[:-1]
-
-# Split into two equal parts
-half_size = len(original_list) // 2
-array1 = original_list[:half_size]
-array2 = original_list[half_size:]
-"""
 
 Task_1=LLM_Tasks.Regression_Task_Int(
     tokenizer,
     Display_Context=Use_Context,
-    max_examples_token_length=max_examples_token_length,
-    #number_range_weights=array1,
-    #Task_Name="Task1"
+    max_examples_token_length=Max_examples_token_length
 )
-Task_2=LLM_Tasks.Multiclass_Logistic_Regression_Task(
+Task_2=LLM_Tasks.Manhattan_Distance_Problem_Int(
     tokenizer,
     Display_Context=Use_Context,
-    max_examples_token_length=max_examples_token_length,
-    #number_range_weights=array2,
-    #Task_Name="Task2"
+    max_examples_token_length=Max_examples_token_length
 )
 
 Task_1_Test=LLM_Tasks.Regression_Task_Int(
     tokenizer,
     Display_Context=Use_Context,
     Testing_samples_num=Testing_Samples,
-    max_examples_token_length=max_examples_token_length,
-    #number_range_weights=array1,
-    #Task_Name="Task1"
+    max_examples_token_length=Max_examples_token_length
 )
-Task_2_Test=LLM_Tasks.Multiclass_Logistic_Regression_Task(
+Task_2_Test=LLM_Tasks.Manhattan_Distance_Problem_Int(
     tokenizer,
     Display_Context=Use_Context,
     Testing_samples_num=Testing_Samples,
-    max_examples_token_length=max_examples_token_length,
-    #number_range_weights=array2,
-    #Task_Name="Task2"
+    max_examples_token_length=Max_examples_token_length
 )
 print("[INFO] Step 1: Finsished")
 
@@ -155,7 +173,6 @@ Rel_Map_Result=RelMap.Get_Relevance_Map(Number_of_samples=Relevance_Steps)
 print("[INFO] Step 2: Finished")
 
 
-
 #Step 3: Use relevance map for probing
 print("[INFO] Step 3: Probing with 1 Layer")
 MyProbing=Probing.Probing(
@@ -167,13 +184,19 @@ MyProbing=Probing.Probing(
     Rel_Map_Result,
     Testing_Samples,
     probing_layers=1,
-    max_memory=max_memory
+    max_memory=max_memory,
+    layers_per_run=Layers_per_run,
+    num_testing_iterations=Num_testing_iterations,
+    learning_rate=Probing_learning_rate,
+    Max_tokens=Max_examples_token_length+100
+
 )
 MyProbing.Get_Probing_Results(Number_of_samples=Probing_Steps)
 print("[INFO] Step 3: Finished")
 
-
 """
+#Possible code for probing with a 2 layer MLP:
+
 #Step 4: Use relevance map for probing
 print("[INFO] Step 4: Probing with 2 Layers")
 MyProbing=Probing.Probing(
@@ -185,17 +208,18 @@ MyProbing=Probing.Probing(
     Rel_Map_Result,
     Testing_Samples,
     probing_layers=2,
-    Allowed_Model_Usage_Before_Refresh=200,
     max_memory=max_memory,
-    num_gpus=1,
-    num_cpus=10
+    layers_per_run=Layers_per_run,
+    num_testing_iterations=Num_testing_iterations,
+    learning_rate=Probing_learning_rate,
+    Max_tokens=Max_examples_token_length+100
 )
-MyProbing.Get_Probing_Results(Number_of_samples=2000)
+MyProbing.Get_Probing_Results(Number_of_samples=Probing_Steps)
 print("[INFO] Step 4: Finished")
+
+
 """
-
-
-#Step 2: Make experiments with Intervention
+#Step 5: Make experiments with Intervention
 print("[INFO] Step 5: Intervention")
 tasksettings=[]
 tasksettings.append([Task_1,Task_1])
