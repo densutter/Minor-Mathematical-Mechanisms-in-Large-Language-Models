@@ -1,33 +1,35 @@
-Note: Part of this code is copied from other code as well as using ChatGPT. I noted when I took some code from somewhere else directly in the code. However I do not specifically mark the sections made with the help from ChatGPT. To avoid any copyright issues, assume that the whole code was made with the help from ChatGPT.
+## **Notes on Code Usage**  
+Some parts of this code were copied from other sources and generated using ChatGPT. Any directly copied code is explicitly noted within the code. However, sections written with ChatGPT's assistance are not specifically marked. **To avoid any copyright issues, assume the entire code was developed with the help of ChatGPT.**  
 
+## **Running the Experiment Pipeline**  
+To reproduce the results from my experiment pipeline in the report, run:  
+```bash
+python main.py
+```
 
-To get the the results from my experiment pipeline in my report run: 
+## **Project Structure**  
 
-main.py
+### **Main Script**  
+- **`main.py`** – Main program to run the experiments.  
 
+### **Task & Feature Relevance Analysis**  
+- **`LLM_Tasks.py`** – Generates tasks for the LLMs.  
+- **`Relevance_Maps.py`** – Computes relevance maps.  
+- **`Prediction_Model.py`** – Runs and evaluates feature relevance in a model.  
 
-A description about the different files:
+### **Probing & Interventions**  
+- **`Probing.py`** – Runs probing experiments.  
+- **`Interventions.py`** – Performs intervention analysis.  
+- **`Intervention_Model.py`** – Runs the model for intervention analysis.  
 
-main.py: main programm to run experiments
+### **Results & Visualization**  
+- **`Generate_Result_Graphics.py`** – Generates graphs from interim results.  
 
-LLM_Tasks.py: includes the code for generate the tasks for the LLMs
+### **Helper Modules**  
+- **`captum_helper.py`** – Overwrites Captum’s original code (fixing functionality issues).  
+- **`Prediction_Helpers.py`** – Helper functions for `Relevance_Maps.py` and `Probing.py`.  
+- **`TimeMeasurer.py`** – Provides time predictions for experiments.  
 
-Relevance_Maps.py: Includes the computation of the relevance maps
+---
 
-Prediction_Model.py: Includes the code necessary to run and evaluate the relevance of features in a model
-
-Probing.py: Code to run probing experiments
-
-Interventions.py: Code to get the intervention analysis
-
-Intervention_Model.py: Includes the code to run the model for intervention analysis
-
-Generate\_Result\_Graphics.py: Generates Graphs using the interim results
-
-captum_helper.py: Helper for captum (overwriting original code, as original code did not work)
-
-Prediction\_Helpers.py: Helper code for Relevance_Maps.py and Probing.py
-
-TimeMeasurer.py: Code to get some needed time predictions
-
-
+This version is cleaner and easier to navigate. Let me know if you want further refinements! 🚀
