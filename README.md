@@ -3,7 +3,7 @@ Note: Part of this code is copied from other code as well as using ChatGPT. I no
 
 To get the the results from my experiment pipeline in my report run: 
 
-main.py file
+main.py
 
 
 A description about the different files:
