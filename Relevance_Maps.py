@@ -48,7 +48,7 @@ class Relevance_Map(Prediction_Helpers.Prediction_Helper):
         self.task_1=task_1
         self.task_2=task_2
         self.interim_results_folder=interim_results_folder
-        self.interim_results_path=self.interim_results_folder+'Relevance_'+Relevance_Map_Method+'/' #task_1.Task_Name+'-VS-'+task_2.Task_Name+
+        self.interim_results_path=self.interim_results_folder+'Relevance_'+Relevance_Map_Method+'/' 
 
         self.Check_Interim_Results_Folder()
         self.Metadata=None
@@ -56,7 +56,6 @@ class Relevance_Map(Prediction_Helpers.Prediction_Helper):
         self.verbose=verbose
         self.tokenizer=tokenizer
 
-        #It is likely that there is some memory leakage.Therefore the model gets deleted all Allowed_Model_Usage_Before_Refresh iterations to clean up the memory
         self.Allowed_Model_Usage_Before_Refresh=Allowed_Model_Usage_Before_Refresh
         self.Actual_Model_Usage=0
         self.model_handler=None

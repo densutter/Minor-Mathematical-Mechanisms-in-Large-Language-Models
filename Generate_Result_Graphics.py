@@ -14,12 +14,6 @@ import matplotlib.patches as patches
 import seaborn as sns
 
 
-#Hyperparameters:
-#model_id = "Local-Meta-Llama-3.2-1B"
-#Relevance_Map_Method='vanilla_gradient' #'smoothGrad'
-#Probing_Method='Probing'
-#tokenizer = AutoTokenizer.from_pretrained(model_id)
-#Use_Context=True
 
 Testing_Samples=40*100
 Task_1=LLM_Tasks.Regression_Task_Int(None,Display_Context=False)
@@ -55,13 +49,14 @@ def MakeSkylinePlot(y_vals,y_names,url,x_vals=None,mconst=round((22**2)/12,2)):
     
     ax.axhline(y=mconst, color='darkgreen', linestyle='dashed', linewidth=2, label="y = "+str(mconst))
     
+    ax.set_ylim(0, None)
+    
     ax.set_xticks(x_vals)
     ax.set_xticklabels(x_vals)
     
     ax.set_xlabel("Depth")  
     ax.set_ylabel("Loss") 
     
-    #ax.legend(loc="upper left", bbox_to_anchor=(1, 1))  # Moves legend outside
     ax.legend(loc="upper left")  # Moves legend outside
     
     plt.savefig(url, bbox_inches="tight", dpi=300)  # High-quality save
@@ -75,7 +70,8 @@ def MakeSkylinePlot_V2(y_vals,y_names,y_label,url,x_vals=None):
     for ac_y_pos,ac_y in enumerate(y_vals):
         ax.step(x_vals, ac_y, where='mid', color=colors[ac_y_pos], linewidth=2, label=y_names[ac_y_pos]) 
     
-    #ax.axhline(y=mconst, color='darkgreen', linestyle='dashed', linewidth=2, label="y = "+str(mconst))
+    
+    ax.set_ylim(0, None)
     
     ax.set_xticks(x_vals)
     ax.set_xticklabels(x_vals)
@@ -83,7 +79,6 @@ def MakeSkylinePlot_V2(y_vals,y_names,y_label,url,x_vals=None):
     ax.set_xlabel("Depth")  
     ax.set_ylabel(y_label) 
     
-    #ax.legend(loc="upper left", bbox_to_anchor=(1, 1))  # Moves legend outside
     ax.legend(loc="upper left")  # Moves legend outside
     
     plt.savefig(url, bbox_inches="tight", dpi=300)  # High-quality save
@@ -106,9 +101,6 @@ def Make_Heatmap_Relevance_Map(HM_Values,Relevance_Heatmap_URL):
                 Heatmap_Vals_Norm[ac_i_p][ac_Depth]=(np_ac_i/np.abs(np_ac_i).max()).tolist()
         for p_ak2,ak2 in enumerate(Heatmap_Vals):
             ak2=np.array(ak2)
-            #print()
-            #print(ak1,p_ak2)
-            #print('*'*100)
             fig = plt.gcf()  # Get the current figure
             fig.set_size_inches(18, 8)  # Set the size in inches
             sns.heatmap(ak2,cmap='icefire', center=0)
@@ -144,7 +136,6 @@ def analyze_data(input_data_structure, test_loss_num):
 
                     # Filter out the relevant loss values for keep_percentage == 1, 0.5, and 0.25
                     for keep_percentage in keep_percentages:
-                        #print(output_version[0])
                         top_loss_values = output_version[0][keep_percentage][-test_loss_num:]
 
 
@@ -165,7 +156,6 @@ def analyze_data(input_data_structure, test_loss_num):
 
                     if results[intermed_var][layer_name][output_version_idx] is None:
                         results[intermed_var][layer_name][output_version_idx]=[None]*len(layer_depths.keys())
-                    #print(int(layer_depth))
                     results[intermed_var][layer_name][output_version_idx][int(layer_depth)] = metrics
     return results
 
@@ -259,16 +249,16 @@ def Make_Heatmap_Probing_Helper(probing_results,probing_results_url,task_name):
                     MakeSkylinePlot(y_vals,y_labels,probing_results_url+'/StepGraphFull_'+intermed_var+"-"+layer_name+'_'+str(output_version_idx)+'.png')
                     y_labels=[]
                     y_vals=[]
-                    y_labels.append(r"$r_{("+task_shortcut+r",t,50)}^{(prob)}$")
+                    y_labels.append(r"$r_{("+task_shortcut+r",\leq,0.5)}^{(prob)}$")
                     y_vals.append(mean_plot_data[1])
-                    y_labels.append(r"$r_{("+task_shortcut+r",b,50)}^{(prob)}$")
+                    y_labels.append(r"$r_{("+task_shortcut+r",\geq,0.5)}^{(prob)}$")
                     y_vals.append(mean_plot_data[2])
                     MakeSkylinePlot(y_vals,y_labels,probing_results_url+'/StepGraph50_'+intermed_var+"-"+layer_name+'_'+str(output_version_idx)+'.png')
                     y_labels=[]
                     y_vals=[]
-                    y_labels.append(r"$r_{("+task_shortcut+r",t,25)}^{(prob)}$")
+                    y_labels.append(r"$r_{("+task_shortcut+r",\leq,0.25)}^{(prob)}$")
                     y_vals.append(mean_plot_data[3])
-                    y_labels.append(r"$r_{("+task_shortcut+r",b,25)}^{(prob)}$")
+                    y_labels.append(r"$r_{("+task_shortcut+r",\geq,0.75)}^{(prob)}$")
                     y_vals.append(mean_plot_data[4])
                     MakeSkylinePlot(y_vals,y_labels,probing_results_url+'/StepGraph25_'+intermed_var+"-"+layer_name+'_'+str(output_version_idx)+'.png')
                 
@@ -421,8 +411,6 @@ for relSet in result_set:
                                 if acval not in  Combination[metric]:
                                     Combination[metric][acval]=[]
                                 Combination[metric][acval].append(result_set[relSet][task1][Combination_task2][1][layerType][layerNum][metric][acval]) 
-                #print(Values) 
-                #print(Combination)
                 for metric in Values:
                     aclabels=[]
                     acvalues=[]
@@ -439,10 +427,22 @@ for relSet in result_set:
                     if Combination is not None:
                         url=folder_path+"/Intervention_Plot_"+metric+"_"+layerType+"_"+task1+"_Combi_"+relSet+".png"
                         aclabels_comb=aclabels+aclabels_comb
-                        aclabels_comb[0]=task2+" "+aclabels_comb[0]
-                        aclabels_comb[1]=task2+" "+aclabels_comb[1]
-                        aclabels_comb[2]=Combination_task2+" "+aclabels_comb[2]
-                        aclabels_comb[3]=Combination_task2+" "+aclabels_comb[3]
-                        MakeSkylinePlot_V2(acvalues+acvalues_comb,aclabels_comb,metric,url)   
+                        at1="LR"
+                        if task1=="Manhattan":
+                            at1="MD"
+                        at2="LR"
+                        if task2=="Manhattan":
+                            at2="MD"
+                        atc2="LR"
+                        if Combination_task2=="Manhattan":
+                            atc2="MD"
+                        aclabels_comb[0]=r"$\rho_{("+at1+r","+at2+r","+r"B)}$"
+                        aclabels_comb[1]=r"$\rho_{("+at1+r","+at2+r","+r"S)}$"
+                        aclabels_comb[2]=r"$\rho_{("+at1+r","+atc2+r","+r"B)}$"
+                        aclabels_comb[3]=r"$\rho_{("+at1+r","+atc2+r","+r"S)}$"
+                        if metric=="similar_classified":
+                            MakeSkylinePlot_V2(acvalues+acvalues_comb,aclabels_comb,r"$\rho$",url) 
+                        else:
+                            MakeSkylinePlot_V2(acvalues+acvalues_comb,aclabels_comb,metric,url)   
 
 print("[INFO] Step 3: Finished")

@@ -1,16 +1,11 @@
 ## **Notes on Code Usage**  
 Some parts of this code were copied from other sources and generated using ChatGPT. Any directly copied code is explicitly noted within the code. However, sections written with ChatGPT's assistance are not specifically marked. **To avoid any copyright issues, assume the entire code was developed with the help of ChatGPT.**  
 
-## **Running the Experiment Pipeline**  
-To reproduce the results from my experiment pipeline in the report, run:  
-```bash
-python main.py
-```
 
 ## **Project Structure**  
 
 ### **Main Script**  
-- **`main.py`** – Main program to run the experiments.  
+- **`main.py`** – Main program to run the experiments for Llama 3.2 3B. To run it for Llama 3.1 8B comment out lines 52-85 and use lines 86-126 instead.  
 
 ### **Task & Feature Relevance Analysis**  
 - **`LLM_Tasks.py`** – Generates tasks for the LLMs.  
@@ -29,3 +24,20 @@ python main.py
 - **`captum_helper.py`** – Overwrites Captum’s original code (fixing functionality issues).  
 - **`Prediction_Helpers.py`** – Helper functions for `Relevance_Maps.py` and `Probing.py`.  
 - **`TimeMeasurer.py`** – Provides time predictions for experiments.  
+
+### **DAS Experiment** 
+- **`DAS_Experiment.py`** – Main program to run the DAS experiments for Llama 3.2 3B for linear regression. To run it for manhattan distance change line 101 from "Task\_1=LLM\_Tasks.Regression\_Task\_Int(" to "Task\_1=LLM\_Tasks.Manhattan\_Distance\_Problem\_Int(". and   
+
+
+## **Running the main Experiment Pipeline**  
+To reproduce the results from my experiment pipeline in the report, run:  
+```bash
+python main.py
+```
+
+
+## **Running DAS Experiment**  
+To reproduce the results from the DAS Experiment mentioned in the appendix run:  
+```bash
+python DAS_Experiment.py
+```
