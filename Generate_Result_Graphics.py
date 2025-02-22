@@ -249,16 +249,16 @@ def Make_Heatmap_Probing_Helper(probing_results,probing_results_url,task_name):
                     MakeSkylinePlot(y_vals,y_labels,probing_results_url+'/StepGraphFull_'+intermed_var+"-"+layer_name+'_'+str(output_version_idx)+'.png')
                     y_labels=[]
                     y_vals=[]
-                    y_labels.append(r"$r_{("+task_shortcut+r",\leq,0.5)}^{(prob)}$")
-                    y_vals.append(mean_plot_data[1])
                     y_labels.append(r"$r_{("+task_shortcut+r",\geq,0.5)}^{(prob)}$")
+                    y_vals.append(mean_plot_data[1])
+                    y_labels.append(r"$r_{("+task_shortcut+r",\leq,0.5)}^{(prob)}$")
                     y_vals.append(mean_plot_data[2])
                     MakeSkylinePlot(y_vals,y_labels,probing_results_url+'/StepGraph50_'+intermed_var+"-"+layer_name+'_'+str(output_version_idx)+'.png')
                     y_labels=[]
                     y_vals=[]
-                    y_labels.append(r"$r_{("+task_shortcut+r",\leq,0.25)}^{(prob)}$")
+                    y_labels.append(r"$r_{("+task_shortcut+r",\geq,0.25)}^{(prob)}$")
                     y_vals.append(mean_plot_data[3])
-                    y_labels.append(r"$r_{("+task_shortcut+r",\geq,0.75)}^{(prob)}$")
+                    y_labels.append(r"$r_{("+task_shortcut+r",\leq,0.75)}^{(prob)}$")
                     y_vals.append(mean_plot_data[4])
                     MakeSkylinePlot(y_vals,y_labels,probing_results_url+'/StepGraph25_'+intermed_var+"-"+layer_name+'_'+str(output_version_idx)+'.png')
                 
