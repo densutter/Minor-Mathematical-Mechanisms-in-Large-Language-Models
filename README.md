@@ -26,7 +26,7 @@ Some parts of this code were copied from other sources and generated using ChatG
 - **`TimeMeasurer.py`** – Provides time predictions for experiments.  
 
 ### **DAS Experiment** 
-- **`DAS_Experiment.py`** – Main program to run the DAS experiments for Llama 3.2 3B for linear regression. To run it for manhattan distance change line 101 from "Task\_1=LLM\_Tasks.Regression\_Task\_Int(" to "Task\_1=LLM\_Tasks.Manhattan\_Distance\_Problem\_Int(". and   
+- **`DAS_Experiment.py`** – Main program to run the DAS experiments for Llama 3.2 3B for linear regression. To run it for manhattan distance change line 101 from "Task\_1=LLM\_Tasks.Regression\_Task\_Int(" to "Task\_1=LLM\_Tasks.Manhattan\_Distance\_Problem\_Int(".   
 
 
 ## **Running the main Experiment Pipeline**  
