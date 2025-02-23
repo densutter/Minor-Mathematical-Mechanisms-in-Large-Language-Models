@@ -18,7 +18,7 @@ Some parts of this code were copied from other sources and generated using ChatG
 - **`Intervention_Model.py`** – Runs the model for intervention analysis.  
 
 ### **Results & Visualization**  
-- **`Generate_Result_Graphics.py`** – Generates graphs from interim results.  
+- **`Generate_Result_Graphics.py`** – Generates graphs.  
 
 ### **Helper Modules**  
 - **`captum_helper.py`** – Overwrites Captum’s original code (fixing functionality issues).  
