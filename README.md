@@ -1,5 +1,5 @@
 ## **Notes on Code Usage**  
-Some parts of this code were copied from other sources and generated using ChatGPT. Any directly copied code is explicitly noted within the code. However, sections written with ChatGPT's assistance are not specifically marked. **To avoid any copyright issues, assume the entire code was developed with the help of ChatGPT.**  
+Some parts of this code were copied from other sources and generated using ChatGPT. Any directly copied code is explicitly noted within the code. However, sections written with ChatGPT's assistance are not specifically marked. **To avoid potential copyright issues, assume the entire code was developed with the help of ChatGPT.**  
 
 
 ## **Project Structure**  
