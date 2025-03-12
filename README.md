@@ -37,7 +37,7 @@ Some parts of this code were copied from other sources and generated using ChatG
 ## **Running the main Experiment Pipeline**  
 To install the needed libraries, use:  
 ```bash
-pip install -r requirements.txt
+pip install -r Requirements.txt
 ```
 To reproduce the results from my experiment pipeline in the report, run:  
 ```bash
