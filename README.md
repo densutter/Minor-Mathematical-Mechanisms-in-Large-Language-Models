@@ -46,7 +46,7 @@ python main.py
 
 
 ## **Running DAS Experiment**  
-Install the needed libraries as in "Running the main Experiment Pipeline". Then, to reproduce the results from the DAS Experiment mentioned in the appendix run:  
+Install the needed libraries as in "Running the main Experiment Pipeline". Then, to reproduce the results from the DAS Experiment mentioned in the appendix, run:  
 ```bash
 python DAS_Experiment.py
 ```
