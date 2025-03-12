@@ -35,7 +35,7 @@ Some parts of this code were copied from other sources and generated using ChatG
 
 
 ## **Running the main Experiment Pipeline**  
-To install the needed libraries use:  
+To install the needed libraries, use:  
 ```bash
 pip install -r requirements.txt
 ```
@@ -46,7 +46,7 @@ python main.py
 
 
 ## **Running DAS Experiment**  
-To reproduce the results from the DAS Experiment mentioned in the appendix run:  
+To install the needed libraries as in "Running the main Experiment Pipeline". Then reproduce the results from the DAS Experiment mentioned in the appendix run:  
 ```bash
 python DAS_Experiment.py
 ```
