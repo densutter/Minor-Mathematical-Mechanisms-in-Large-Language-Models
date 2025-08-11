@@ -1,3 +1,14 @@
+# **Minor Mathematical Mechanisms in Large Language Models**
+
+
+## **Abstract**  
+
+Large language models (LLMs) have transformed the field of natural language processing (NLP) by opening up a new learning paradigm, called in-context learning (ICL). Considerable work has been done to understand the underlying mechanisms driving ICL. However, no conclusive evidence has been found, and seemingly contradictory explanations have emerged.
+In this work, we investigate two seemingly contrasting viewpoints on in-context learning given mathematical problems. Some studies have demonstrated that large language models can perform mathematical algorithms, such as solving linear regression. However, other work suggests that ICL primarily relies on simpler mechanisms, such as heuristics and similarity computations. This work aims to bridge the gap between these two viewpoints on in-context learning by investigating the extent to which mathematical algorithms influence the predictions of Llama 3.2 3B and Llama 3.1 8B.  In doing so, we provide indications that mathematical mechanisms exist in LLMs, vary across different mathematical problems, and have only limited influence on the predictions of the LLM.
+
+The full report is given in "Report.pdf"
+
+
 ## **Notes on Code Usage**  
 Some parts of this code were copied from other sources and generated using ChatGPT. Any directly copied code is explicitly noted within the code. However, sections written with ChatGPT's assistance are not specifically marked. **To avoid potential copyright issues, assume the entire code was developed with the help of ChatGPT.**  
 
